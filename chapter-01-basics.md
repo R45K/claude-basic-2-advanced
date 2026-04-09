@@ -555,16 +555,17 @@ All exercises happen inside this folder.
 
 **Setup:** In your empty `claude-training` folder, create a minimal stub project first.
 
-Create `src/app.rb`:
-```ruby
-# A simple task management API
-def create_task(title, due_date)
-  # TODO: implement
-end
+Create `src/app.ts`:
+```typescript
+// A simple task management API
 
-def list_tasks
-  # TODO: implement
-end
+function createTask(title: string, dueDate: string): void {
+  // TODO: implement
+}
+
+function listTasks(): void {
+  // TODO: implement
+}
 ```
 
 Now create `CLAUDE.md` in the root:
@@ -581,7 +582,7 @@ A simple REST API for managing tasks. This is a training project.
 ## Conventions
 - All functions must have comments explaining what they do
 - Never delete tasks — mark them as archived instead
-- Use snake_case for all variable and function names
+- Use camelCase for variable and function names, PascalCase for types and classes
 
 ## What Claude Should Never Do
 - Add dependencies without asking first
@@ -603,10 +604,10 @@ What does this project do and what rules should I follow when working on it?
 
 Now ask:
 ```
-Implement the create_task function in src/app.rb
+Implement the createTask function in src/app.ts
 ```
 
-**Observe:** Claude follows the conventions in CLAUDE.md without being told again — it adds comments, uses snake_case.
+**Observe:** Claude follows the conventions in CLAUDE.md without being told again — it adds comments, uses camelCase.
 
 **What to experiment with:**
 - Add a rule like "Always add a timestamp to every new function as a comment" — does Claude follow it?
@@ -619,20 +620,20 @@ Implement the create_task function in src/app.rb
 
 **Goal:** Feel the difference between a vague prompt and a well-structured one on real code.
 
-**Setup:** Create a file with an intentional bug. Create `src/calculator.rb`:
-```ruby
-def running_total(transactions)
-  total = 0
-  i = 0
-  while i <= transactions.length  # bug: should be <, not <=
-    total += transactions[i]
-    i += 1
-  end
-  total
-end
+**Setup:** Create a file with an intentional bug. Create `src/calculator.ts`:
+```typescript
+function runningTotal(transactions: number[]): number {
+  let total = 0;
+  let i = 0;
+  while (i <= transactions.length) {  // bug: should be <, not <=
+    total += transactions[i];
+    i++;
+  }
+  return total;
+}
 
-puts running_total([10, 20, 30])  # should print 60
-puts running_total([])            # crashes with NoMethodError
+console.log(runningTotal([10, 20, 30]));  // should print 60
+console.log(runningTotal([]));            // crashes with TypeError
 ```
 
 In Claude Code, first type this vague prompt:
@@ -645,8 +646,8 @@ Note the response — Claude will likely ask which file, what bug, or make assum
 Now type this structured prompt:
 ```
 <context>
-The file src/calculator.rb has a function called running_total.
-It crashes with a NoMethodError when called with an empty array.
+The file src/calculator.ts has a function called runningTotal.
+It crashes with a TypeError when called with an empty array.
 It also has an off-by-one error that causes incorrect results on non-empty arrays.
 </context>
 
@@ -656,7 +657,7 @@ Find both bugs and fix them. Return only the corrected function.
 
 <constraints>
 - Do not change the function signature
-- Do not add any gems or dependencies
+- Do not add any packages or dependencies
 - Preserve the existing comments
 </constraints>
 
@@ -678,20 +679,20 @@ Return the fixed function only, in a code block. No explanation needed.
 
 **Goal:** Use `/plan` before executing a non-trivial change so you can review, adjust, and approve.
 
-**Setup:** Your `claude-training` project now has `src/app.rb` and `src/calculator.rb`. Let's add one more stub to make the task meaningful.
+**Setup:** Your `claude-training` project now has `src/app.ts` and `src/calculator.ts`. Let's add one more stub to make the task meaningful.
 
-Create `src/task_store.rb`:
-```ruby
-# In-memory task storage (not persistent)
-TASKS = []
+Create `src/task_store.ts`:
+```typescript
+// In-memory task storage (not persistent)
+const tasks: unknown[] = [];
 
-def find_task(id)
-  # TODO
-end
+function findTask(id: string): void {
+  // TODO
+}
 
-def delete_task(id)
-  # TODO — but remember: we archive, never delete
-end
+function deleteTask(id: string): void {
+  // TODO — but remember: we archive, never delete
+}
 ```
 
 Now type:
@@ -710,7 +711,7 @@ Looks good, go ahead.
 
 If you want to change something:
 ```
-Change step 2 — don't modify app.rb directly. Create a new file src/health.rb and require it from app.rb instead.
+Change step 2 — don't modify app.ts directly. Create a new file src/health.ts and import it in app.ts instead.
 ```
 
 **Observe:** Claude updates the plan before executing. You maintained control over the architecture.
