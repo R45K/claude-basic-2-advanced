@@ -65,53 +65,13 @@ This shift unlocks productivity. Instead of managing Claude's work (feeding it i
 
 ## 2. Installing and Configuring Claude Code
 
-### Prerequisites
-
-Before installing Claude Code, verify you have these:
-
-- **Node.js 18 or later.** Check with `node --version`. If you don't have it, install from https://nodejs.org or use a version manager like `nvm` (recommended).
-- **An Anthropic API key.** You'll need this to authenticate with Claude. Get one at https://console.anthropic.com/account/keys (requires an Anthropic account with API access enabled).
-- **A code editor.** Claude Code is a CLI tool, not an IDE, but you'll want a good editor for reviewing what it writes. VS Code is standard, but any editor works.
-
 ### Installation
 
-Claude Code is a global npm package. Installation is straightforward:
+For installation instructions, prerequisites, and API key setup, follow the official documentation:
 
-```bash
-npm install -g @anthropic-ai/claude-code
-```
+**https://docs.anthropic.com/en/docs/claude-code/getting-started**
 
-This installs the `claude` command globally. You can now run `claude` from any directory.
-
-After installation, verify it works:
-
-```bash
-claude --version
-```
-
-If this succeeds, you're ready. If not, check that your npm global bin directory is in your `$PATH`. On most systems, `npm install -g` handles this automatically, but if Claude Code doesn't run, try:
-
-```bash
-npm config get prefix
-```
-
-and ensure that directory's `bin` subdirectory is in your `$PATH`.
-
-### Setting Your API Key
-
-Claude Code needs your Anthropic API key to function. You can provide it in two ways:
-
-**Option 1: Environment variable (recommended for security).** Set the `ANTHROPIC_API_KEY` environment variable:
-
-```bash
-export ANTHROPIC_API_KEY='sk-ant-...'
-```
-
-Add this to your shell's rc file (`.bashrc`, `.zshrc`, etc.) to make it persistent.
-
-**Option 2: Interactive prompt.** When you run `claude` for the first time without an API key set, it will ask you for one and offer to save it locally.
-
-> WARNING: Never commit your API key to version control. Never paste it in code, documentation, or anywhere public. If you accidentally expose it, rotate it immediately at https://console.anthropic.com/account/keys.
+The official docs are kept up to date with the latest requirements and platform-specific notes. Complete the installation and verify it works before continuing.
 
 ### First Run: Starting Claude Code
 
