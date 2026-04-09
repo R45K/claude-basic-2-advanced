@@ -123,6 +123,16 @@ claude
 
 You'll see a welcome message and a `>` prompt. This is the Claude Code REPL. You can now type prompts and interact with Claude in the context of your project.
 
+**Initializing a new project.** If this is a new project with no `CLAUDE.md` yet, run:
+
+```bash
+claude init
+```
+
+`claude init` bootstraps the project by generating a starter `CLAUDE.md` based on your current directory structure, detected tech stack, and git history. It asks a few questions interactively and produces a ready-to-edit configuration. You should review and refine the output before committing it—this file will guide every Claude session on the project.
+
+> TIP: Run `claude init` once per project, then keep `CLAUDE.md` updated as the project evolves. Treat it like any other source file: review it in PRs, update it when conventions change.
+
 Let's verify everything is working:
 
 ```
@@ -146,6 +156,14 @@ The output tells you what's working and what might need attention. For a fresh i
 ### First Run Tips
 
 **Understand the session model.** Each time you run `claude`, you start a new session. The session maintains memory within that invocation, but when you exit (Ctrl+C), the session ends. Your persistent memory lives in `CLAUDE.md`—the project configuration file we'll cover extensively in the next section.
+
+**Resuming a previous session.** If you closed Claude Code mid-task and want to pick up exactly where you left off—including the full conversation history and tool state—run:
+
+```bash
+claude resume
+```
+
+Claude Code stores recent sessions locally. `claude resume` lists them by project and timestamp so you can select the one to continue. This is different from just re-running `claude`: that starts fresh, while `resume` restores the conversation context, any pending tasks, and the thread of work you were doing. Use it whenever you need to continue a multi-step task that was interrupted.
 
 **Always start in your project root.** When you `claude`, start from the root of your project. Claude Code reads the `CLAUDE.md` file in the current directory (and parent directories) to load context. If you start in a subdirectory and `CLAUDE.md` is at the root, it might not find it.
 
