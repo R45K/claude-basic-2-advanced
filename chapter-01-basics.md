@@ -133,6 +133,66 @@ Claude Code stores recent sessions locally. `claude resume` lists them by projec
 
 ---
 
+**Exercise 1-D: Verify Your Installation**
+
+**Goal:** Confirm Claude Code is installed correctly, explore the basic REPL, and make sure Claude can read a file in your project.
+
+**Setup:** Create the training folder you'll use for all exercises in this chapter:
+
+```bash
+mkdir claude-training && cd claude-training && git init
+```
+
+Then create a simple file for Claude to read. Create `hello.ts`:
+```typescript
+// A greeting function
+function greet(name: string): string {
+  return `Hello, ${name}!`;
+}
+
+console.log(greet("Claude Code"));
+```
+
+Now verify your installation:
+
+```bash
+claude --version
+```
+
+Confirm you see a version number. Then start Claude Code in the `claude-training` folder:
+
+```bash
+claude
+```
+
+Run the diagnostic command:
+```
+> /doctor
+```
+
+**Observe:** Review the output. Note which checks pass and which indicate missing configuration (plugins, MCPs). This is your baseline.
+
+Now ask Claude to read the file you created:
+```
+What does hello.ts do?
+```
+
+**Observe:** Claude reads the file directly from disk and describes it. No copy-pasting required.
+
+Finally, ask:
+```
+> /help
+```
+
+**Observe:** Browse the available commands. You'll use most of these throughout this training.
+
+**What to experiment with:**
+- Run `claude --version` and note the version. Check the official docs to see if it matches the latest release.
+- Try `/help doctor` to see the detailed help for the `/doctor` command.
+- Exit with `/exit`, then re-run `claude` and ask "What does hello.ts do?" again — Claude still has access to your files even in a fresh session.
+
+---
+
 ## 3. CLAUDE.md — Your Project's Brain
 
 ### What CLAUDE.md Is and Why It Matters
@@ -343,6 +403,73 @@ TIP: Run `/revise-claude-md` periodically (e.g., quarterly) to keep your project
 
 ---
 
+**Exercise 1-A: Your First CLAUDE.md**
+
+**Goal:** Create a CLAUDE.md that gives Claude meaningful project context, then see how it affects Claude's behavior.
+
+**Setup:** In your empty `claude-training` folder, create a minimal stub project first.
+
+Create `src/app.ts`:
+```typescript
+// A simple task management API
+
+function createTask(title: string, dueDate: string): void {
+  // TODO: implement
+}
+
+function listTasks(): void {
+  // TODO: implement
+}
+```
+
+Now create `CLAUDE.md` in the root:
+```markdown
+# Task Manager API
+
+## What This Is
+A simple REST API for managing tasks. This is a training project.
+
+## Key Commands
+- Run tests: `echo "no tests yet"`
+- Start server: `echo "not implemented yet"`
+
+## Conventions
+- All functions must have comments explaining what they do
+- Never delete tasks — mark them as archived instead
+- Use camelCase for variable and function names, PascalCase for types and classes
+
+## What Claude Should Never Do
+- Add dependencies without asking first
+- Modify this CLAUDE.md file
+- Use global variables
+```
+
+Start Claude Code in this folder:
+```bash
+claude
+```
+
+Then type:
+```
+What does this project do and what rules should I follow when working on it?
+```
+
+**Observe:** Claude reads CLAUDE.md and answers from it — project purpose, conventions, and guardrails all come from the file you wrote.
+
+Now ask:
+```
+Implement the createTask function in src/app.ts
+```
+
+**Observe:** Claude follows the conventions in CLAUDE.md without being told again — it adds comments, uses camelCase.
+
+**What to experiment with:**
+- Add a rule like "Always add a timestamp to every new function as a comment" — does Claude follow it?
+- Add a contradictory instruction mid-conversation and see which wins: CLAUDE.md or your message
+- Remove the "Never Do" section entirely and notice if Claude's behavior changes on the next task
+
+---
+
 ## 4. Prompt Engineering Best Practices
 
 The quality of Claude's output depends directly on the quality of your prompts. This is true in chat, but it's even more critical in Claude Code because you're asking Claude to operate with agency on your codebase. A vague prompt leads to wasted time and rework. A precise prompt gets you exactly what you need.
@@ -522,6 +649,65 @@ Plan mode separates thinking from doing. It lets you validate the approach befor
 
 ---
 
+**Exercise 1-B: Vague vs. Precise Prompts**
+
+**Goal:** Feel the difference between a vague prompt and a well-structured one on real code.
+
+**Setup:** Create a file with an intentional bug. Create `src/calculator.ts`:
+```typescript
+function runningTotal(transactions: number[]): number {
+  let total = 0;
+  let i = 0;
+  while (i <= transactions.length) {  // bug: should be <, not <=
+    total += transactions[i];
+    i++;
+  }
+  return total;
+}
+
+console.log(runningTotal([10, 20, 30]));  // should print 60
+console.log(runningTotal([]));            // crashes with TypeError
+```
+
+In Claude Code, first type this vague prompt:
+```
+Fix my code
+```
+
+Note the response — Claude will likely ask which file, what bug, or make assumptions.
+
+Now type this structured prompt:
+```
+<context>
+The file src/calculator.ts has a function called runningTotal.
+It crashes with a TypeError when called with an empty array.
+It also has an off-by-one error that causes incorrect results on non-empty arrays.
+</context>
+
+<task>
+Find both bugs and fix them. Return only the corrected function.
+</task>
+
+<constraints>
+- Do not change the function signature
+- Do not add any packages or dependencies
+- Preserve the existing comments
+</constraints>
+
+<output_format>
+Return the fixed function only, in a code block. No explanation needed.
+</output_format>
+```
+
+**Observe:** The structured prompt produces a targeted, correct fix. The vague one wastes a turn on clarification.
+
+**What to experiment with:**
+- Remove `<output_format>` and see how verbose the response becomes
+- Add `Think step by step before writing any code` at the top — does the fix quality improve?
+- Try rewriting the vague prompt just by adding one sentence of context — how much does that alone help?
+
+---
+
 ## 5. Essential Claude Code Slash Commands
 
 Slash commands are shortcuts that trigger specific behaviors in Claude Code. They're prefixed with `/`. Here are the essential ones you need from day one.
@@ -587,146 +773,6 @@ Exits the session gracefully:
 
 ---
 
-## 6. Hands-On Exercises
-
-The best way to internalize Claude Code is to use it. Here are 5 exercises, each designed to teach a specific skill. They build on each other, so work through them in order. Every exercise starts from a completely empty git repo.
-
-**Setup that applies to ALL exercises in this chapter:**
-
-```bash
-mkdir claude-training && cd claude-training && git init
-```
-
-All exercises happen inside this folder.
-
----
-
-**Exercise 1-A: Your First CLAUDE.md**
-
-**Goal:** Create a CLAUDE.md that gives Claude meaningful project context, then see how it affects Claude's behavior.
-
-**Setup:** In your empty `claude-training` folder, create a minimal stub project first.
-
-Create `src/app.ts`:
-```typescript
-// A simple task management API
-
-function createTask(title: string, dueDate: string): void {
-  // TODO: implement
-}
-
-function listTasks(): void {
-  // TODO: implement
-}
-```
-
-Now create `CLAUDE.md` in the root:
-```markdown
-# Task Manager API
-
-## What This Is
-A simple REST API for managing tasks. This is a training project.
-
-## Key Commands
-- Run tests: `echo "no tests yet"`
-- Start server: `echo "not implemented yet"`
-
-## Conventions
-- All functions must have comments explaining what they do
-- Never delete tasks — mark them as archived instead
-- Use camelCase for variable and function names, PascalCase for types and classes
-
-## What Claude Should Never Do
-- Add dependencies without asking first
-- Modify this CLAUDE.md file
-- Use global variables
-```
-
-Start Claude Code in this folder:
-```bash
-claude
-```
-
-Then type:
-```
-What does this project do and what rules should I follow when working on it?
-```
-
-**Observe:** Claude reads CLAUDE.md and answers from it — project purpose, conventions, and guardrails all come from the file you wrote.
-
-Now ask:
-```
-Implement the createTask function in src/app.ts
-```
-
-**Observe:** Claude follows the conventions in CLAUDE.md without being told again — it adds comments, uses camelCase.
-
-**What to experiment with:**
-- Add a rule like "Always add a timestamp to every new function as a comment" — does Claude follow it?
-- Add a contradictory instruction mid-conversation and see which wins: CLAUDE.md or your message
-- Remove the "Never Do" section entirely and notice if Claude's behavior changes on the next task
-
----
-
-**Exercise 1-B: Vague vs. Precise Prompts**
-
-**Goal:** Feel the difference between a vague prompt and a well-structured one on real code.
-
-**Setup:** Create a file with an intentional bug. Create `src/calculator.ts`:
-```typescript
-function runningTotal(transactions: number[]): number {
-  let total = 0;
-  let i = 0;
-  while (i <= transactions.length) {  // bug: should be <, not <=
-    total += transactions[i];
-    i++;
-  }
-  return total;
-}
-
-console.log(runningTotal([10, 20, 30]));  // should print 60
-console.log(runningTotal([]));            // crashes with TypeError
-```
-
-In Claude Code, first type this vague prompt:
-```
-Fix my code
-```
-
-Note the response — Claude will likely ask which file, what bug, or make assumptions.
-
-Now type this structured prompt:
-```
-<context>
-The file src/calculator.ts has a function called runningTotal.
-It crashes with a TypeError when called with an empty array.
-It also has an off-by-one error that causes incorrect results on non-empty arrays.
-</context>
-
-<task>
-Find both bugs and fix them. Return only the corrected function.
-</task>
-
-<constraints>
-- Do not change the function signature
-- Do not add any packages or dependencies
-- Preserve the existing comments
-</constraints>
-
-<output_format>
-Return the fixed function only, in a code block. No explanation needed.
-</output_format>
-```
-
-**Observe:** The structured prompt produces a targeted, correct fix. The vague one wastes a turn on clarification.
-
-**What to experiment with:**
-- Remove `<output_format>` and see how verbose the response becomes
-- Add `Think step by step before writing any code` at the top — does the fix quality improve?
-- Try rewriting the vague prompt just by adding one sentence of context — how much does that alone help?
-
----
-
 **Exercise 1-C: Plan Mode for a Real Task**
 
 **Goal:** Use `/plan` before executing a non-trivial change so you can review, adjust, and approve.
@@ -775,7 +821,7 @@ Change step 2 — don't modify app.ts directly. Create a new file src/health.ts 
 
 ---
 
-## 7. Chapter Summary and What's Next
+## 6. Chapter Summary and What's Next
 
 Congratulations. You've covered the foundation of Claude Code.
 

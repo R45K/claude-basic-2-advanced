@@ -162,187 +162,6 @@ Final Output
 
 Tip: Add a validation step after each agent that checks output structure before handing off.
 
----
-
-### Pattern B: Orchestrator-Worker
-
-A central orchestrator agent breaks down the task, dispatches work to specialized worker agents, and aggregates results. This pattern is more flexible than sequential chains.
-
-```
-                    ┌─→ [Worker: Code Writer] → code.py
-                    │
-[Orchestrator] ─→ [Decompose Task]
-                    │
-                    ├─→ [Worker: Test Writer] → test.py
-                    │
-                    └─→ [Worker: Doc Writer] → README.md
-
-                         (Orchestrator gathers all outputs)
-                         ↓
-                    [Final Artifact]
-```
-
-**When to use:** When a task naturally decomposes into independent subtasks that different specialists should handle. When you want flexibility in *how* the work is split.
-
-**Example scenario:** Building a new feature
-- Orchestrator reads requirements, breaks into: "Write core logic", "Write tests", "Update docs"
-- Sends each to a specialized worker
-- Collects all outputs, ensures consistency, produces final artifact
-
-**How the orchestrator communicates:**
-
-Workers are typically subagents spawned by the orchestrator. Communication is explicit via shared files:
-
-```
-Orchestrator creates:
-  .claude/subtasks/write-code.md
-  .claude/subtasks/write-tests.md
-  .claude/subtasks/write-docs.md
-
-Worker 1 reads: .claude/subtasks/write-code.md
-         writes: src/implementation.py
-
-Worker 2 reads: .claude/subtasks/write-tests.md
-         writes: tests/test_implementation.py
-
-Worker 3 reads: .claude/subtasks/write-docs.md
-         writes: docs/api.md
-
-Orchestrator reads all outputs, merges and validates
-```
-
-**Key advantages:**
-- Flexible decomposition: orchestrator decides how to split work
-- Specialization: each worker is optimized for one task
-- Better context usage: each worker focuses narrowly
-- Easier to add/remove workers without rewriting the chain
-
-**Pitfalls:**
-- Orchestrator becomes a bottleneck; it must be smart and efficient
-- Dependencies between subtasks can emerge (e.g., tests need code first)
-- Aggregating results requires careful handling of inconsistencies
-
-Warning: If workers have dependencies (Test Writer needs Code Writer's output), you're not purely parallel. Consider a hybrid: orchestrator identifies dependencies and either sequences them or passes outputs explicitly.
-
----
-
-### Pattern C: Parallel Fan-Out / Fan-In
-
-A specialized case of orchestrator-worker: the orchestrator splits a task into *independent* parallel subtasks, launches all concurrently, then merges results.
-
-```
-                    ┌─→ [Agent 1] → result_1
-                    │
-[Orchestrator] ─→ [Fan Out]
-                    │
-                    ├─→ [Agent 2] → result_2
-                    │
-                    └─→ [Agent 3] → result_3
-
-                    [Fan In / Merge Results]
-                         ↓
-                    [Final Output]
-```
-
-**When to use:** When you have independent work that can be parallelized. The wall-clock time goes from `3x agent_time` to roughly `agent_time` (ignoring overhead).
-
-**Real-world example:** Code review at scale.
-- Orchestrator: "Review this codebase for: performance issues, security vulnerabilities, code style"
-- Agent 1 (Performance): Analyzes for bottlenecks
-- Agent 2 (Security): Looks for security issues
-- Agent 3 (Style): Checks code conventions
-- All three run in parallel, results merged into one comprehensive review
-
-**Another example:** Testing across modules.
-- Orchestrator: "Test these 4 modules"
-- Agents 1-4 each test one module in parallel
-- Results merged: "2 modules pass, module 3 has 5 failures, module 4 has 1 warning"
-
-**Key advantages:**
-- Massive speedup: running 5 agents in parallel is nearly 5x faster
-- Agents remain independent; easy to add more parallel workers
-- Results merge cleanly if structured consistently
-
-**Pitfalls:**
-- Merge logic must handle inconsistencies (same file reviewed by 2 agents → conflicts)
-- If one agent is slow, all others must wait (bottleneck on slowest task)
-- Hard to debug cross-agent issues (which agent reported what?)
-
----
-
-### Pattern D: Feedback Loop (Generate → Test → Fix)
-
-A single agent or small team loops until output meets a success criterion. Common in TDD, iterative refinement, and validation pipelines.
-
-```
-[Agent: Generator]
-    ↓
-[Produce Output]
-    ↓
-[Agent: Validator]
-    ↓
-[Check: Does output pass?]
-    ↓ (No) ← Feedback Loop
-    ↓ (Yes)
-[Success: Output approved]
-```
-
-**When to use:** When you have a clear success criterion but the path to success is uncertain. When iterative refinement is cheaper than getting it right the first time.
-
-**Real-world examples:**
-- TDD: write test → implement → run test → fix implementation → repeat until green
-- Prompt engineering: generate response → evaluate quality → refine prompt → repeat
-- Code generation: generate code → run linter → fix style issues → repeat
-
-**Key advantages:**
-- Natural for TDD and iterative development
-- Success is objective (tests pass, criteria met)
-- Agents learn from feedback; loops often converge quickly
-- Reduces need for perfect instructions upfront
-
-**Pitfalls:**
-- Can loop forever if criterion is unreachable or too strict
-- Each iteration costs API tokens and time
-- Need explicit retry limits and circuit breakers
-
----
-
-### Pattern E: Git Worktrees for True Parallel Isolation
-
-When agents must modify the same codebase simultaneously without conflicts, use git worktrees to give each agent its own isolated branch.
-
-```
-Main Repository (main branch)
-    ↓
-git worktree add ../feature-auth -b feature/auth
-    ↓
-[Session 1: Agent in feature-auth worktree]
-    ↓
-[Modifies code in isolated branch]
-    ↓
-[When complete: git merge feature/auth back to main]
-```
-
-**When to use:** When you need true parallel agent work on the same codebase without git conflicts. Each agent gets its own branch and can commit independently.
-
-**Real-world scenario:**
-- Two agents building different features simultaneously
-- Each works in its own worktree branch
-- No merge conflicts because they never touch the same files
-- When both finish, merge both branches sequentially into main
-
-**Key advantages:**
-- Complete isolation: agents don't see each other's uncommitted changes
-- Git handles merging automatically if files don't conflict
-- Safe for long-running parallel tasks
-- Natural fallback to conflict resolution if overlaps occur
-
----
-
-## 3. Hands-On Exercises
-
-The following exercises teach workflow patterns through Claude Code agents. Each exercise builds real agents that coordinate via shared files or git. **Critical rule:** Every exercise must work from a completely empty git repo. Any code the exercise works on is created as part of the exercise setup steps.
-
 ### Exercise 4-A: Sequential Chain — Planner → Coder → Reviewer
 
 **Goal:** Build a three-agent chain where each agent picks up where the previous one left off, communicating via files.
@@ -470,6 +289,166 @@ Use the feature-reviewer to review the implementation
 
 ---
 
+### Pattern B: Orchestrator-Worker
+
+A central orchestrator agent breaks down the task, dispatches work to specialized worker agents, and aggregates results. This pattern is more flexible than sequential chains.
+
+```
+                    ┌─→ [Worker: Code Writer] → code.py
+                    │
+[Orchestrator] ─→ [Decompose Task]
+                    │
+                    ├─→ [Worker: Test Writer] → test.py
+                    │
+                    └─→ [Worker: Doc Writer] → README.md
+
+                         (Orchestrator gathers all outputs)
+                         ↓
+                    [Final Artifact]
+```
+
+**When to use:** When a task naturally decomposes into independent subtasks that different specialists should handle. When you want flexibility in *how* the work is split.
+
+**Example scenario:** Building a new feature
+- Orchestrator reads requirements, breaks into: "Write core logic", "Write tests", "Update docs"
+- Sends each to a specialized worker
+- Collects all outputs, ensures consistency, produces final artifact
+
+**How the orchestrator communicates:**
+
+Workers are typically subagents spawned by the orchestrator. Communication is explicit via shared files:
+
+```
+Orchestrator creates:
+  .claude/subtasks/write-code.md
+  .claude/subtasks/write-tests.md
+  .claude/subtasks/write-docs.md
+
+Worker 1 reads: .claude/subtasks/write-code.md
+         writes: src/implementation.py
+
+Worker 2 reads: .claude/subtasks/write-tests.md
+         writes: tests/test_implementation.py
+
+Worker 3 reads: .claude/subtasks/write-docs.md
+         writes: docs/api.md
+
+Orchestrator reads all outputs, merges and validates
+```
+
+**Key advantages:**
+- Flexible decomposition: orchestrator decides how to split work
+- Specialization: each worker is optimized for one task
+- Better context usage: each worker focuses narrowly
+- Easier to add/remove workers without rewriting the chain
+
+**Pitfalls:**
+- Orchestrator becomes a bottleneck; it must be smart and efficient
+- Dependencies between subtasks can emerge (e.g., tests need code first)
+- Aggregating results requires careful handling of inconsistencies
+
+Warning: If workers have dependencies (Test Writer needs Code Writer's output), you're not purely parallel. Consider a hybrid: orchestrator identifies dependencies and either sequences them or passes outputs explicitly.
+
+### Exercise 4-D: Orchestrator + Workers
+
+**Goal:** Build an orchestrator that decomposes a task into briefs and delegates each to a specialist.
+
+**Setup:** No new code files needed — the orchestrator will plan new functionality for the project.
+
+Create `.claude/agents/project-orchestrator.md`:
+
+```markdown
+---
+name: project-orchestrator
+description: Breaks a complex feature request into subtask briefs for specialist agents. Use to plan large features before implementation starts.
+tools: Read, Write, Glob
+model: sonnet
+---
+
+You plan complex work. You NEVER write code — you write briefs for other agents.
+
+When given a feature request:
+1. Read the current project structure (use Glob to understand what exists)
+2. Break the feature into 3-5 focused subtasks
+3. For each subtask, write a brief to `.claude/subtasks/[subtask-name].md`:
+
+---
+## Subtask: [name]
+## What to Build
+[specific description — clear enough for a junior developer]
+## Files to Create or Modify
+- [path]: [what changes]
+## Inputs
+[what this subtask needs from other subtasks, if anything]
+## Outputs
+[what this subtask produces for other subtasks]
+## Success Criteria
+- [checkable condition]
+- [checkable condition]
+## Recommended Agent
+[suggest: feature-coder, test-writer, security-reviewer, or other]
+---
+
+4. After writing all briefs, list the subtasks in execution order with dependencies noted.
+```
+
+In Claude Code:
+
+```
+Use the project-orchestrator to break down this feature: "Add user registration and login to the task manager — users should be able to sign up with email and password, log in, and only see their own tasks"
+```
+
+**Observe:** The orchestrator reads the current project, identifies what exists, and produces separate brief files in `.claude/subtasks/`. Read each one — they should be specific enough to hand to a developer or agent.
+
+**What to experiment with:**
+- Pick one brief from `.claude/subtasks/` and ask the feature-coder to implement it
+- Ask the orchestrator: "Which subtask is most risky and why?"
+- Ask it to produce briefs for a feature in your real project — evaluate whether the briefs are actually useful
+
+---
+
+### Pattern C: Parallel Fan-Out / Fan-In
+
+A specialized case of orchestrator-worker: the orchestrator splits a task into *independent* parallel subtasks, launches all concurrently, then merges results.
+
+```
+                    ┌─→ [Agent 1] → result_1
+                    │
+[Orchestrator] ─→ [Fan Out]
+                    │
+                    ├─→ [Agent 2] → result_2
+                    │
+                    └─→ [Agent 3] → result_3
+
+                    [Fan In / Merge Results]
+                         ↓
+                    [Final Output]
+```
+
+**When to use:** When you have independent work that can be parallelized. The wall-clock time goes from `3x agent_time` to roughly `agent_time` (ignoring overhead).
+
+**Real-world example:** Code review at scale.
+- Orchestrator: "Review this codebase for: performance issues, security vulnerabilities, code style"
+- Agent 1 (Performance): Analyzes for bottlenecks
+- Agent 2 (Security): Looks for security issues
+- Agent 3 (Style): Checks code conventions
+- All three run in parallel, results merged into one comprehensive review
+
+**Another example:** Testing across modules.
+- Orchestrator: "Test these 4 modules"
+- Agents 1-4 each test one module in parallel
+- Results merged: "2 modules pass, module 3 has 5 failures, module 4 has 1 warning"
+
+**Key advantages:**
+- Massive speedup: running 5 agents in parallel is nearly 5x faster
+- Agents remain independent; easy to add more parallel workers
+- Results merge cleanly if structured consistently
+
+**Pitfalls:**
+- Merge logic must handle inconsistencies (same file reviewed by 2 agents → conflicts)
+- If one agent is slow, all others must wait (bottleneck on slowest task)
+- Hard to debug cross-agent issues (which agent reported what?)
+
 ### Exercise 4-B: Parallel Fan-Out — Three Agents, One Report
 
 **Goal:** Run three specialist review agents simultaneously and merge their findings into a single document.
@@ -563,6 +542,41 @@ Run the performance-reviewer and style-reviewer in parallel on src/invoiceGenera
 
 ---
 
+### Pattern D: Feedback Loop (Generate → Test → Fix)
+
+A single agent or small team loops until output meets a success criterion. Common in TDD, iterative refinement, and validation pipelines.
+
+```
+[Agent: Generator]
+    ↓
+[Produce Output]
+    ↓
+[Agent: Validator]
+    ↓
+[Check: Does output pass?]
+    ↓ (No) ← Feedback Loop
+    ↓ (Yes)
+[Success: Output approved]
+```
+
+**When to use:** When you have a clear success criterion but the path to success is uncertain. When iterative refinement is cheaper than getting it right the first time.
+
+**Real-world examples:**
+- TDD: write test → implement → run test → fix implementation → repeat until green
+- Prompt engineering: generate response → evaluate quality → refine prompt → repeat
+- Code generation: generate code → run linter → fix style issues → repeat
+
+**Key advantages:**
+- Natural for TDD and iterative development
+- Success is objective (tests pass, criteria met)
+- Agents learn from feedback; loops often converge quickly
+- Reduces need for perfect instructions upfront
+
+**Pitfalls:**
+- Can loop forever if criterion is unreachable or too strict
+- Each iteration costs API tokens and time
+- Need explicit retry limits and circuit breakers
+
 ### Exercise 4-C: The Feedback Loop — Generate, Test, Fix, Repeat
 
 **Goal:** Build an agent that loops until its code passes tests — entirely autonomously.
@@ -654,63 +668,35 @@ Use the tdd-implementer to implement the toRoman function.
 
 ---
 
-### Exercise 4-D: Orchestrator + Workers
+### Pattern E: Git Worktrees for True Parallel Isolation
 
-**Goal:** Build an orchestrator that decomposes a task into briefs and delegates each to a specialist.
-
-**Setup:** No new code files needed — the orchestrator will plan new functionality for the project.
-
-Create `.claude/agents/project-orchestrator.md`:
-
-```markdown
----
-name: project-orchestrator
-description: Breaks a complex feature request into subtask briefs for specialist agents. Use to plan large features before implementation starts.
-tools: Read, Write, Glob
-model: sonnet
----
-
-You plan complex work. You NEVER write code — you write briefs for other agents.
-
-When given a feature request:
-1. Read the current project structure (use Glob to understand what exists)
-2. Break the feature into 3-5 focused subtasks
-3. For each subtask, write a brief to `.claude/subtasks/[subtask-name].md`:
-
----
-## Subtask: [name]
-## What to Build
-[specific description — clear enough for a junior developer]
-## Files to Create or Modify
-- [path]: [what changes]
-## Inputs
-[what this subtask needs from other subtasks, if anything]
-## Outputs
-[what this subtask produces for other subtasks]
-## Success Criteria
-- [checkable condition]
-- [checkable condition]
-## Recommended Agent
-[suggest: feature-coder, test-writer, security-reviewer, or other]
----
-
-4. After writing all briefs, list the subtasks in execution order with dependencies noted.
-```
-
-In Claude Code:
+When agents must modify the same codebase simultaneously without conflicts, use git worktrees to give each agent its own isolated branch.
 
 ```
-Use the project-orchestrator to break down this feature: "Add user registration and login to the task manager — users should be able to sign up with email and password, log in, and only see their own tasks"
+Main Repository (main branch)
+    ↓
+git worktree add ../feature-auth -b feature/auth
+    ↓
+[Session 1: Agent in feature-auth worktree]
+    ↓
+[Modifies code in isolated branch]
+    ↓
+[When complete: git merge feature/auth back to main]
 ```
 
-**Observe:** The orchestrator reads the current project, identifies what exists, and produces separate brief files in `.claude/subtasks/`. Read each one — they should be specific enough to hand to a developer or agent.
+**When to use:** When you need true parallel agent work on the same codebase without git conflicts. Each agent gets its own branch and can commit independently.
 
-**What to experiment with:**
-- Pick one brief from `.claude/subtasks/` and ask the feature-coder to implement it
-- Ask the orchestrator: "Which subtask is most risky and why?"
-- Ask it to produce briefs for a feature in your real project — evaluate whether the briefs are actually useful
+**Real-world scenario:**
+- Two agents building different features simultaneously
+- Each works in its own worktree branch
+- No merge conflicts because they never touch the same files
+- When both finish, merge both branches sequentially into main
 
----
+**Key advantages:**
+- Complete isolation: agents don't see each other's uncommitted changes
+- Git handles merging automatically if files don't conflict
+- Safe for long-running parallel tasks
+- Natural fallback to conflict resolution if overlaps occur
 
 ### Exercise 4-E: Git Worktrees — True Parallel Isolation
 
@@ -778,7 +764,7 @@ git worktree remove ../claude-training-auth
 
 ---
 
-## 4. Patterns in Practice: Common Scenarios
+## 3. Patterns in Practice: Common Scenarios
 
 ### Scenario 1: Adding a Complex Feature
 
@@ -843,7 +829,7 @@ git worktree remove ../claude-training-auth
 
 ---
 
-## 5. State Management and Communication
+## 4. State Management and Communication
 
 ### Shared Files as Communication
 
@@ -894,9 +880,102 @@ Use `.claude/state.md` or similar to track workflow progress:
 
 Agents can check this state before proceeding, ensuring they don't run before dependencies are ready.
 
+### Exercise 4-F: Shared State Handoff Between Agents
+
+**Goal:** Create a shared state file that two agents read and write to coordinate a handoff — observe how state flows explicitly between agents.
+
+**Setup:** Initialize a fresh directory and a minimal state file. Create `.claude/workflow-state.json`:
+
+```json
+{
+  "status": "pending",
+  "phase": "plan",
+  "plan_file": null,
+  "implementation_file": null,
+  "last_updated_by": null,
+  "notes": []
+}
+```
+
+Create `src/greetingService.ts`:
+
+```typescript
+// Greeting service — generates a personalized greeting
+// TODO: implement buildGreeting(name: string, timeOfDay: "morning" | "afternoon" | "evening"): string
+// Should return e.g. "Good morning, Alice!" — capitalize name, use correct time phrase
+// Returns "Hello, [name]!" as fallback if timeOfDay is unrecognized
+```
+
+Create `.claude/agents/stateful-planner.md`:
+
+```markdown
+---
+name: stateful-planner
+description: Plans a feature and records its status in .claude/workflow-state.json. Always updates state before and after work.
+tools: Read, Write
+model: sonnet
 ---
 
-## 6. Error Handling and Retries
+You plan features and update shared workflow state.
+
+Steps:
+1. Read `.claude/workflow-state.json`
+2. Update it: set `"status": "in_progress"`, `"phase": "plan"`, `"last_updated_by": "stateful-planner"`
+3. Write the updated JSON back to `.claude/workflow-state.json`
+4. Read the feature stub you are asked to plan
+5. Write a concise implementation plan to `.claude/current-plan.md` (goal, steps, file list)
+6. Update `.claude/workflow-state.json` again:
+   - `"status": "ready"`, `"phase": "implement"`, `"plan_file": ".claude/current-plan.md"`, `"last_updated_by": "stateful-planner"`
+   - Append a note to the `"notes"` array: `"Plan written at [ISO timestamp]"`
+7. Confirm: "State updated — ready for stateful-coder"
+```
+
+Create `.claude/agents/stateful-coder.md`:
+
+```markdown
+---
+name: stateful-coder
+description: Implements a feature by reading the plan from .claude/workflow-state.json. Refuses to run if state is not "ready" for implementation.
+tools: Read, Write, Bash
+model: sonnet
+---
+
+You implement features and update shared workflow state.
+
+Steps:
+1. Read `.claude/workflow-state.json`
+2. Check: if `"phase"` is not `"implement"` or `"status"` is not `"ready"`, stop and say "Workflow not ready — current state: [phase/status]. Run stateful-planner first."
+3. Read the plan file at the path stored in `"plan_file"`
+4. Update state: `"status": "in_progress"`, `"phase": "implement"`, `"last_updated_by": "stateful-coder"`
+5. Implement the feature described in the plan
+6. Update `.claude/workflow-state.json`:
+   - `"status": "done"`, `"phase": "complete"`, `"implementation_file": "[path to file you wrote]"`, `"last_updated_by": "stateful-coder"`
+   - Append a note: `"Implementation complete at [ISO timestamp]"`
+7. Confirm: "Implementation done — state updated to complete"
+```
+
+In Claude Code, run the two-agent sequence:
+
+```
+Use the stateful-planner to plan the buildGreeting function in src/greetingService.ts
+```
+
+After it completes, read `.claude/workflow-state.json` to confirm the handoff recorded correctly. Then:
+
+```
+Use the stateful-coder to implement the planned feature
+```
+
+**Observe:** The state file captures each transition — who ran, when, what was produced. If you try to run `stateful-coder` before `stateful-planner` has set `"phase": "implement"`, the coder refuses to proceed.
+
+**What to experiment with:**
+- Reset `.claude/workflow-state.json` to `"phase": "plan"` and try running `stateful-coder` directly — observe the guard check in action
+- Add a third agent `stateful-reviewer` that reads `implementation_file` from state and only runs when `"phase": "complete"`
+- Extend the state schema with a `"retry_count"` field — have an agent increment it on each failed attempt
+
+---
+
+## 5. Error Handling and Retries
 
 ### Validation Between Handoffs
 
@@ -934,9 +1013,89 @@ Iteration 5: Tests fail again, GIVE UP (circuit breaker)
 Report to human: "TDD failed after 5 iterations, needs manual review"
 ```
 
+### Exercise 4-G: Intentional Failure and Fallback Handling
+
+**Goal:** Deliberately break an agent step, observe the failure, then add a fallback agent that handles it gracefully.
+
+**Setup:** Create a file that references a non-existent dependency. Create `src/currencyConverter.ts`:
+
+```typescript
+// Currency converter — converts amounts between currencies
+// TODO: implement convert(amount: number, from: string, to: string): number
+// Load rates from ./ratesData.json (this file does not exist yet)
+// If the file is missing or the currency pair is unknown, throw an Error
+```
+
+Create `.claude/agents/brittle-coder.md`:
+
+```markdown
+---
+name: brittle-coder
+description: Implements a function by reading its stub. Does NOT handle missing dependencies — will fail loudly if referenced files are absent.
+tools: Read, Write, Bash
+model: sonnet
 ---
 
-## 7. Debugging Multi-Agent Workflows
+Implement the function described in the stub you are given.
+1. Read the stub file
+2. Read any files the stub references (import paths, data files, etc.)
+3. Write the implementation — use the referenced files as-is, do not create them
+4. Run `npx tsc --noEmit` to check for type errors
+5. Report success or failure, including the exact error message if it fails
+```
+
+Create `.claude/agents/resilient-coder.md`:
+
+```markdown
+---
+name: resilient-coder
+description: Implements a function and handles missing dependencies by creating sensible stubs or fallbacks. Use when brittle-coder has failed.
+tools: Read, Write, Bash
+model: sonnet
+---
+
+You are the fallback agent. You handle implementation failures gracefully.
+
+Steps:
+1. Read `.claude/errors.md` to understand what went wrong
+2. Read the original stub file
+3. For each missing dependency identified in the error:
+   - Create a minimal stub that satisfies the import (e.g., a `ratesData.json` with a few sample rates)
+   - Document in a comment that this is a stub: `// STUB: replace with real data source`
+4. Implement the function using the stubs you created
+5. Run `npx tsc --noEmit` to verify it compiles
+6. Append to `.claude/errors.md`: "Fallback resolution: [what you created and why]"
+7. Report: what failed, what you created, and what the caller should do next
+```
+
+In Claude Code:
+
+```
+Use the brittle-coder to implement the convert function in src/currencyConverter.ts
+```
+
+The agent will fail because `ratesData.json` does not exist. After it fails, manually record the error:
+
+```
+Write the brittle-coder's failure message to .claude/errors.md
+```
+
+Then trigger the fallback:
+
+```
+Use the resilient-coder to fix the failed implementation in src/currencyConverter.ts
+```
+
+**Observe:** The brittle-coder fails loudly when it encounters the missing file. The resilient-coder reads the error log, creates a stub `ratesData.json`, implements the function, and documents what it did. The implementation now compiles.
+
+**What to experiment with:**
+- After the resilient-coder runs, break the implementation again by deleting `ratesData.json` and ask the brittle-coder to retry — does it still fail the same way?
+- Add an orchestrating prompt that automatically routes to `resilient-coder` whenever `brittle-coder` reports a failure, without your manual intervention
+- Extend `resilient-coder` to increment a `retry_count` in `.claude/errors.md` and refuse to retry more than 3 times
+
+---
+
+## 6. Debugging Multi-Agent Workflows
 
 When a workflow fails, trace the issue systematically:
 
@@ -954,7 +1113,7 @@ When a workflow fails, trace the issue systematically:
 
 ---
 
-## 8. Cost Optimization
+## 7. Cost Optimization
 
 Running multiple agents costs more than a single agent. Optimize:
 
@@ -971,7 +1130,7 @@ Running multiple agents costs more than a single agent. Optimize:
 
 ---
 
-## 9. When NOT to Use Multi-Agent Workflows
+## 8. When NOT to Use Multi-Agent Workflows
 
 Agentic workflows add complexity. Stick with a single agent if:
 

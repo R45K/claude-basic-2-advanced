@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv chapter-02-agents.md chapter-03-agents.md)",
+      "Bash(mv chapter-03-agentic-workflows.md chapter-04-agentic-workflows.md)",
+      "Bash(mv chapter-04-context-handling.md chapter-05-context-handling.md)",
+      "Bash(mv chapter-05-cost-management.md chapter-06-cost-management.md)",
+      "Bash(mv chapter-06-ecosystem.md chapter-07-ecosystem.md)",
+      "Bash(grep -n \"^## \\\\|^### \\\\|^---$\" \"C:/Users/raul/Workspaces/sandbox/training/chapter-03-agents.md\")",
+      "Bash(gh auth:*)",
+      "Bash(git --version)",
+      "WebSearch"
+    ]
+  }
+}

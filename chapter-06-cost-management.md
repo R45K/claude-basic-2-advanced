@@ -96,6 +96,52 @@ Understanding this explains our optimization strategy: **reducing output token c
 
 ---
 
+**Exercise 6-D: The /cost Habit**
+
+**Goal:** Build a cost-tracking practice so you can catch expensive agents early.
+
+**Setup:** No new files needed — use the agents and files you've built across all chapters.
+
+Create a cost log file: `.claude/cost-log.md`:
+```markdown
+# Agent Cost Log
+
+Track token usage here to build intuition for what things cost.
+
+| Agent | Task | ΔInput Tokens | ΔOutput Tokens | Notes |
+|---|---|---|---|---|
+| (example) hello-agent | summarize project | ~800 | ~200 | cheap, good for routing |
+```
+
+Now audit your 5 most-used agents. For each one:
+
+```
+/cost
+```
+(note the before number)
+
+Run the agent on a representative task, then:
+```
+/cost
+```
+(note the after number, calculate the delta)
+
+Update `.claude/cost-log.md` with the result.
+
+Do this for: hello-agent, security-reviewer, tdd-implementer, feature-planner, and architecture-analyst.
+
+**Observe:** Some agents are much more expensive than expected. Usually it's because:
+- Their system prompt is long
+- They read many files
+- They produce long output
+
+**What to experiment with:**
+- Find your most expensive agent and reduce its cost by 25% — either lean the system prompt, add `model: haiku`, or limit the files it reads
+- Set a personal rule: "No single agent run should cost more than 5,000 tokens" — which agents violate this?
+- Add cost estimates to your agent descriptions: "Typical cost: ~1,500 tokens" so future-you remembers
+
+---
+
 ## 2. Model Selection Strategy — The Intelligence Ladder
 
 The single biggest lever for cost is **choosing the right model for each task**. This is where most teams waste money.
@@ -247,6 +293,104 @@ If you'd used Sonnet for all three: $0.0234 (49% more expensive for same capabil
 
 ---
 
+**Exercise 6-A: Feel the Model Difference**
+
+**Goal:** Calibrate your intuition for cost vs quality by running the same code review task with Haiku, Sonnet, and Opus.
+
+**Setup:** Create a file with a mix of obvious and subtle issues. Create `src/paymentProcessor.ts`:
+```typescript
+// Payment processing module
+const API_KEY = "sk_live_abc123xyz";  // hardcoded production key
+
+async function chargeCustomer(customerId: string, amount: number): Promise<boolean> {
+  // No input validation
+  // No idempotency key — double-charging possible if retried
+  const response = await fetch("https://api.stripe.com/v1/charges", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${API_KEY}` },
+    body: JSON.stringify({ amount, customer: customerId, currency: "usd" })
+  });
+
+  if (response.status === 200) {
+    logCharge(customerId, amount);
+    return true;
+  }
+  return false;  // silently swallows all errors
+}
+
+function logCharge(id: string, amount: number): void {
+  console.log(`Charged ${id}: $${amount}`);  // logs to stdout, not a real logger
+  fs.appendFileSync("charges.log", `${id},${amount}\n`);
+}
+```
+
+Create three reviewer agents:
+
+Create `.claude/agents/haiku-reviewer.md`:
+```markdown
+---
+name: haiku-reviewer
+description: Quick code review using Haiku. Fast and cheap. Use for routine reviews.
+tools: Read
+model: haiku
+---
+Review the given file. List the top 5 issues with: [SEVERITY] Issue description. Fix: one sentence. Nothing else.
+```
+
+Create `.claude/agents/sonnet-reviewer.md`:
+```markdown
+---
+name: sonnet-reviewer
+description: Thorough code review using Sonnet. Balanced quality and cost. Default for most reviews.
+tools: Read
+model: sonnet
+---
+Review the given file. For each of the top 5 issues: describe the problem, explain why it matters, and give a specific fix. Be thorough.
+```
+
+Create `.claude/agents/opus-reviewer.md`:
+```markdown
+---
+name: opus-reviewer
+description: Deep code review using Opus. Maximum reasoning depth. Use for critical security or architecture decisions only.
+tools: Read
+model: opus
+---
+Review the given file. Think carefully about non-obvious issues: subtle race conditions, security implications, failure modes under load, long-term maintainability risks. Focus on things a less careful reviewer would miss.
+```
+
+Run each one in sequence, using `/cost` to measure:
+```
+/cost
+```
+```
+Use the haiku-reviewer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+```
+Use the sonnet-reviewer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+```
+Use the opus-reviewer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+
+**Observe:** Compare what each model finds. Haiku catches the obvious ones (hardcoded key, no validation). Sonnet finds more and explains them better. Opus may surface the idempotency risk and the silent error swallowing — things that only matter at scale.
+
+**What to experiment with:**
+- For this payment code, which model do you think is worth paying for? Write your answer in CLAUDE.md as a team guideline
+- Find a simple config file or README in the project — run haiku-reviewer on it. Is Haiku perfectly adequate for non-critical files?
+- Add this to your CLAUDE.md: "Model guidelines: haiku for formatting/docs/commits, sonnet for code, opus only for payment/auth/security"
+
+---
+
 ## 3. Prompt Caching — The Hidden Gem
 
 Prompt caching is one of the most underused cost optimizations. Many teams don't even know about it.
@@ -316,6 +460,74 @@ With caching (assuming 20 requests within 5-min window):
 - One-off analysis requests
 - Conversations with changing system prompts
 - Real-time chat where each message is unique
+
+---
+
+**Exercise 6-F: See Prompt Caching in Action**
+
+**Goal:** Observe the cost difference between a cold cache miss and a warm cache hit, and learn how to structure prompts so caching kicks in.
+
+**Setup:** Create an agent with a long, stable system prompt — the kind that represents a real production scenario where the same instructions are sent on every call.
+
+Create `.claude/agents/cached-reviewer.md`:
+```markdown
+---
+name: cached-reviewer
+description: Code reviewer with a large stable system prompt — designed to demonstrate prompt caching savings. Run it twice in quick succession to observe cache hit vs miss cost.
+tools: Read
+model: sonnet
+---
+
+You are a code reviewer for a TypeScript web application. The following guidelines are fixed for every review:
+
+SECURITY RULES:
+- Never allow hardcoded secrets, API keys, or credentials in source files
+- Validate all external inputs before use
+- Use parameterized queries — no string interpolation in SQL
+- All auth-related code must handle token expiry explicitly
+- Log security events but never log sensitive data (passwords, tokens, PII)
+
+PERFORMANCE RULES:
+- Flag O(n²) or worse loops when input size is unbounded
+- Identify missing database indexes based on query patterns
+- Note any synchronous I/O operations inside async loops
+- Flag large allocations inside hot paths
+
+ERROR HANDLING RULES:
+- Every async function must have explicit error handling
+- Silent swallowing of errors (empty catch blocks) is always a finding
+- Errors must be logged with context before re-throwing or returning
+- Network calls must handle timeouts and retry logic
+
+OUTPUT FORMAT:
+Return findings as a list. Each finding: [SEVERITY: HIGH/MED/LOW] Location: file:line — Issue description. Fix: one sentence.
+If no issues found, respond: "No issues found."
+```
+
+Now run it twice back-to-back on the same file — fast enough that the cache is still warm (within 5 minutes):
+
+```
+/cost
+```
+```
+Use the cached-reviewer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+```
+Use the cached-reviewer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+
+**Observe:** The first call is a cache write — you pay full input price. The second call is a cache read — the large system prompt portion costs ~10% of what it did on the first call. The delta between the two `/cost` readings should be noticeably smaller for the second run.
+
+**What to experiment with:**
+- Wait 10 minutes and run the agent a third time — does the cost jump back up? (Cache expired.)
+- Modify one word in the system prompt, then run twice — does the savings disappear? (Cache invalidated.)
+- Add a second agent that puts variable content (like the current timestamp) near the top of the prompt — observe that caching stops working. This illustrates why stable prefixes matter.
 
 ---
 
@@ -485,6 +697,68 @@ For each issue, explain the problem, impact, and fix.
 
 ---
 
+**Exercise 6-C: Write Lean System Prompts**
+
+**Goal:** Measure the token cost of verbose vs lean agent system prompts and develop an eye for waste.
+
+**Setup:** Create two agents with identical purpose but very different system prompt lengths.
+
+Create `.claude/agents/bloated-summarizer.md`:
+```markdown
+---
+name: bloated-summarizer
+description: Summarizes a file
+tools: Read
+model: haiku
+---
+
+You are an expert software engineer and technical writer with many years of experience reading and summarizing code across many different programming languages and paradigms. Your deep expertise allows you to quickly understand complex codebases and distill them into clear, concise summaries that are useful for developers of all experience levels.
+
+When you are asked to summarize a file, please make sure to cover all of the following aspects: what the file does at a high level, what the main functions or classes are and what they do, any important patterns or conventions used, any dependencies or imports, and any notable features or issues you observe.
+
+Please write your summary in a clear, well-organized format that would be helpful to a developer who is seeing this file for the first time. Make sure to use plain language and avoid jargon where possible. Be thorough and comprehensive while also being concise and easy to read.
+```
+
+Create `.claude/agents/lean-summarizer.md`:
+```markdown
+---
+name: lean-summarizer
+description: Summarizes a file
+tools: Read
+model: haiku
+---
+
+Summarize the given file in 3-5 sentences: what it does, its main functions, and anything notable.
+```
+
+Run both on the same file:
+```
+/cost
+```
+```
+Use the bloated-summarizer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+```
+Use the lean-summarizer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+
+**Observe:** The lean summarizer costs 40-60% less per call, and the output quality is nearly identical — Haiku doesn't need long instructions to summarize well.
+
+Compare the summaries: is the bloated one actually better? Or does the extra instruction length just add cost without improving output?
+
+**What to experiment with:**
+- Rewrite your three reviewer agents (haiku/sonnet/opus) with lean system prompts — measure the savings
+- Apply the lean prompt principle to the security-reviewer from Chapter 3 — can you cut it by 30% without losing quality?
+- Count the words in each of your `.claude/agents/` files — try to get all system prompts under 100 words
+
+---
+
 ## 5. Output Token Control
 
 Output tokens cost 3-5x more than input tokens. **Controlling output length is the highest-leverage cost optimization.**
@@ -592,6 +866,67 @@ That's real money.
 
 ---
 
+**Exercise 6-G: Measure Output Constraints**
+
+**Goal:** Quantify the token savings from adding explicit output length and format instructions, and verify that constrained output is still useful.
+
+**Setup:** Create two agents that do the same task — one with no output constraints, one with explicit constraints — and compare both cost and quality.
+
+Create `.claude/agents/unconstrained-analyzer.md`:
+```markdown
+---
+name: unconstrained-analyzer
+description: Analyzes a TypeScript file and explains what it does. No output constraints — responds naturally.
+tools: Read
+model: sonnet
+---
+
+Read the given file and explain what it does. Cover: its purpose, how it works, any issues you notice, and how you would improve it.
+```
+
+Create `.claude/agents/constrained-analyzer.md`:
+```markdown
+---
+name: constrained-analyzer
+description: Analyzes a TypeScript file with strict output constraints. Returns structured findings only — no prose.
+tools: Read
+model: sonnet
+---
+
+Read the given file. Return exactly this structure, nothing else:
+
+PURPOSE: [one sentence]
+HOW IT WORKS: [two sentences max]
+TOP 3 ISSUES: [bullet list, one line each]
+RECOMMENDED IMPROVEMENT: [one sentence]
+```
+
+Run both on the same file:
+```
+/cost
+```
+```
+Use the unconstrained-analyzer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+```
+Use the constrained-analyzer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+
+**Observe:** The constrained version typically produces 60-80% fewer output tokens. Compare the two responses — does the constrained version actually miss anything important, or does the structure force it to be more precise?
+
+**What to experiment with:**
+- Try adding `max_tokens: 300` to the constrained agent's frontmatter — does it ever get cut off mid-response? Does the quality hold?
+- Ask the unconstrained-analyzer to "write a full explanation suitable for a README" and the constrained-analyzer to return the same — measure the cost difference at scale (imagine 500 files)
+- Identify one of your existing agents that produces unexpectedly long output — add a format constraint and measure the savings
+
+---
+
 ## 6. Agentic Workflow Cost Optimization
 
 Agentic systems are powerful but can become cost black holes if designed poorly. The issue: **every tool call, every decision, every retry is more tokens**.
@@ -650,106 +985,6 @@ Use the file-selector with this task: "We need to fix a bug in user authenticati
 - Test how accurately Haiku filters different file types
 - Find a task where aggressive pre-filtering saves the most tokens
 - Measure: how much does filtered context reduce total workflow cost?
-
----
-
-## 7. Exercises: Hands-On Cost Management
-
-**Exercise 6-A: Feel the Model Difference**
-
-**Goal:** Calibrate your intuition for cost vs quality by running the same code review task with Haiku, Sonnet, and Opus.
-
-**Setup:** Create a file with a mix of obvious and subtle issues. Create `src/paymentProcessor.ts`:
-```typescript
-// Payment processing module
-const API_KEY = "sk_live_abc123xyz";  // hardcoded production key
-
-async function chargeCustomer(customerId: string, amount: number): Promise<boolean> {
-  // No input validation
-  // No idempotency key — double-charging possible if retried
-  const response = await fetch("https://api.stripe.com/v1/charges", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${API_KEY}` },
-    body: JSON.stringify({ amount, customer: customerId, currency: "usd" })
-  });
-
-  if (response.status === 200) {
-    logCharge(customerId, amount);
-    return true;
-  }
-  return false;  // silently swallows all errors
-}
-
-function logCharge(id: string, amount: number): void {
-  console.log(`Charged ${id}: $${amount}`);  // logs to stdout, not a real logger
-  fs.appendFileSync("charges.log", `${id},${amount}\n`);
-}
-```
-
-Create three reviewer agents:
-
-Create `.claude/agents/haiku-reviewer.md`:
-```markdown
----
-name: haiku-reviewer
-description: Quick code review using Haiku. Fast and cheap. Use for routine reviews.
-tools: Read
-model: haiku
----
-Review the given file. List the top 5 issues with: [SEVERITY] Issue description. Fix: one sentence. Nothing else.
-```
-
-Create `.claude/agents/sonnet-reviewer.md`:
-```markdown
----
-name: sonnet-reviewer
-description: Thorough code review using Sonnet. Balanced quality and cost. Default for most reviews.
-tools: Read
-model: sonnet
----
-Review the given file. For each of the top 5 issues: describe the problem, explain why it matters, and give a specific fix. Be thorough.
-```
-
-Create `.claude/agents/opus-reviewer.md`:
-```markdown
----
-name: opus-reviewer
-description: Deep code review using Opus. Maximum reasoning depth. Use for critical security or architecture decisions only.
-tools: Read
-model: opus
----
-Review the given file. Think carefully about non-obvious issues: subtle race conditions, security implications, failure modes under load, long-term maintainability risks. Focus on things a less careful reviewer would miss.
-```
-
-Run each one in sequence, using `/cost` to measure:
-```
-/cost
-```
-```
-Use the haiku-reviewer on src/paymentProcessor.ts
-```
-```
-/cost
-```
-```
-Use the sonnet-reviewer on src/paymentProcessor.ts
-```
-```
-/cost
-```
-```
-Use the opus-reviewer on src/paymentProcessor.ts
-```
-```
-/cost
-```
-
-**Observe:** Compare what each model finds. Haiku catches the obvious ones (hardcoded key, no validation). Sonnet finds more and explains them better. Opus may surface the idempotency risk and the silent error swallowing — things that only matter at scale.
-
-**What to experiment with:**
-- For this payment code, which model do you think is worth paying for? Write your answer in CLAUDE.md as a team guideline
-- Find a simple config file or README in the project — run haiku-reviewer on it. Is Haiku perfectly adequate for non-critical files?
-- Add this to your CLAUDE.md: "Model guidelines: haiku for formatting/docs/commits, sonnet for code, opus only for payment/auth/security"
 
 ---
 
@@ -833,114 +1068,6 @@ Use the task-router to classify this task: "Review the payment_processor.rb file
 
 ---
 
-**Exercise 6-C: Write Lean System Prompts**
-
-**Goal:** Measure the token cost of verbose vs lean agent system prompts and develop an eye for waste.
-
-**Setup:** Create two agents with identical purpose but very different system prompt lengths.
-
-Create `.claude/agents/bloated-summarizer.md`:
-```markdown
----
-name: bloated-summarizer
-description: Summarizes a file
-tools: Read
-model: haiku
----
-
-You are an expert software engineer and technical writer with many years of experience reading and summarizing code across many different programming languages and paradigms. Your deep expertise allows you to quickly understand complex codebases and distill them into clear, concise summaries that are useful for developers of all experience levels.
-
-When you are asked to summarize a file, please make sure to cover all of the following aspects: what the file does at a high level, what the main functions or classes are and what they do, any important patterns or conventions used, any dependencies or imports, and any notable features or issues you observe.
-
-Please write your summary in a clear, well-organized format that would be helpful to a developer who is seeing this file for the first time. Make sure to use plain language and avoid jargon where possible. Be thorough and comprehensive while also being concise and easy to read.
-```
-
-Create `.claude/agents/lean-summarizer.md`:
-```markdown
----
-name: lean-summarizer
-description: Summarizes a file
-tools: Read
-model: haiku
----
-
-Summarize the given file in 3-5 sentences: what it does, its main functions, and anything notable.
-```
-
-Run both on the same file:
-```
-/cost
-```
-```
-Use the bloated-summarizer on src/paymentProcessor.ts
-```
-```
-/cost
-```
-```
-Use the lean-summarizer on src/paymentProcessor.ts
-```
-```
-/cost
-```
-
-**Observe:** The lean summarizer costs 40-60% less per call, and the output quality is nearly identical — Haiku doesn't need long instructions to summarize well.
-
-Compare the summaries: is the bloated one actually better? Or does the extra instruction length just add cost without improving output?
-
-**What to experiment with:**
-- Rewrite your three reviewer agents (haiku/sonnet/opus) with lean system prompts — measure the savings
-- Apply the lean prompt principle to the security-reviewer from Chapter 3 — can you cut it by 30% without losing quality?
-- Count the words in each of your `.claude/agents/` files — try to get all system prompts under 100 words
-
----
-
-**Exercise 6-D: The /cost Habit**
-
-**Goal:** Build a cost-tracking practice so you can catch expensive agents early.
-
-**Setup:** No new files needed — use the agents and files you've built across all chapters.
-
-Create a cost log file: `.claude/cost-log.md`:
-```markdown
-# Agent Cost Log
-
-Track token usage here to build intuition for what things cost.
-
-| Agent | Task | ΔInput Tokens | ΔOutput Tokens | Notes |
-|---|---|---|---|---|
-| (example) hello-agent | summarize project | ~800 | ~200 | cheap, good for routing |
-```
-
-Now audit your 5 most-used agents. For each one:
-
-```
-/cost
-```
-(note the before number)
-
-Run the agent on a representative task, then:
-```
-/cost
-```
-(note the after number, calculate the delta)
-
-Update `.claude/cost-log.md` with the result.
-
-Do this for: hello-agent, security-reviewer, tdd-implementer, feature-planner, and architecture-analyst.
-
-**Observe:** Some agents are much more expensive than expected. Usually it's because:
-- Their system prompt is long
-- They read many files
-- They produce long output
-
-**What to experiment with:**
-- Find your most expensive agent and reduce its cost by 25% — either lean the system prompt, add `model: haiku`, or limit the files it reads
-- Set a personal rule: "No single agent run should cost more than 5,000 tokens" — which agents violate this?
-- Add cost estimates to your agent descriptions: "Typical cost: ~1,500 tokens" so future-you remembers
-
----
-
 **Exercise 6-E: Design a Cost-Efficient Agent from Scratch**
 
 **Goal:** Build an agent with efficiency as the primary design constraint, not an afterthought.
@@ -1015,7 +1142,7 @@ Summarize all the changes made to this project today, reading the relevant files
 
 ---
 
-## 8. Monitoring & Alerting
+## 7. Monitoring & Alerting
 
 You can't optimize what you don't measure. Set up proper cost tracking and alerting.
 
@@ -1065,7 +1192,69 @@ If you see an unexpected cost spike:
 
 ---
 
-## 9. Real-World Cost Scenarios
+**Exercise 6-H: Build a Pre-Session Cost Awareness Habit**
+
+**Goal:** Develop intuition for what expensive tasks look like by consistently measuring cost before and after complex agent work, and set up a lightweight hook that surfaces this information at the start of each session.
+
+**Setup:** No new agent files required — you'll use the agents and tasks you've already built.
+
+First, create a session cost baseline file at `.claude/session-cost-baseline.md`:
+```markdown
+# Session Cost Baseline
+
+Use /cost at the start of each session and record below.
+Then use /cost after each significant task to see what it added.
+
+| Date | Session Start ($) | After Task ($) | Task Description | Delta |
+|---|---|---|---|---|
+| (example) 2026-04-01 | $0.12 | $0.19 | daily-digest run | $0.07 |
+```
+
+Now set up a pre-session hook. Create `.claude/hooks/pre-session.md`:
+```markdown
+---
+name: pre-session
+trigger: session_start
+---
+
+Display the current `/cost` reading so the user starts each session aware of their monthly spend.
+Then remind: "Run /cost after each major task and log the delta in .claude/session-cost-baseline.md"
+```
+
+For the main exercise, run three tasks in sequence and measure each one:
+
+```
+/cost
+```
+```
+Use the daily-digest to summarize today's changes.
+```
+```
+/cost
+```
+```
+Use the task-router to classify this task: "Refactor the paymentProcessor.ts file to add proper error handling and retry logic"
+```
+```
+/cost
+```
+```
+Use the sonnet-reviewer on src/paymentProcessor.ts
+```
+```
+/cost
+```
+
+**Observe:** The three tasks have very different costs. The daily-digest (Haiku, git only) should be cheapest. The task-router (Haiku, classification only) next. The sonnet-reviewer (Sonnet, file read + analysis) most expensive. Log each delta in `.claude/session-cost-baseline.md`.
+
+**What to experiment with:**
+- Run the opus-reviewer (from Exercise 6-A) and compare its delta to the sonnet-reviewer — is the quality difference worth the cost for this file?
+- Try running the sonnet-reviewer on a trivially simple file (a one-function utility) vs a complex file (paymentProcessor.ts) — does the cost scale with complexity, or is it mostly flat?
+- After a week of logging, look at your cost baseline data — which task types are your biggest spenders? Does that match your intuition?
+
+---
+
+## 8. Real-World Cost Scenarios
 
 Let's work through realistic examples with actual numbers.
 
@@ -1182,7 +1371,7 @@ The cost optimization techniques in this chapter are embedded into these repos a
 
 ---
 
-## 10. Summary: Cost Management as a Discipline
+## 9. Summary: Cost Management as a Discipline
 
 Cost management isn't about being cheap — it's about being **deliberate**. Here's the summary:
 

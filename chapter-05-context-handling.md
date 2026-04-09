@@ -180,6 +180,76 @@ When current usage exceeds the alert threshold, pause and consider compacting or
 
 ---
 
+**Exercise 5-A: Feel the Context Fill Up**
+
+**Goal:** Directly observe context growing and learn to manage it with `/cost` and `/compact`.
+
+**Setup:** Add several files to the project so there's something to read. Run these commands in your terminal to create stub files:
+
+```bash
+# Create src/billing.ts
+cat > src/billing.ts << 'EOF'
+// Billing module
+export function calculateInvoice(orderId: string): void {}
+export function applyDiscount(invoice: unknown, code: string): void {}
+export function sendInvoiceEmail(invoice: unknown, customer: unknown): void {}
+EOF
+
+# Create src/notifications.ts
+cat > src/notifications.ts << 'EOF'
+// Notifications module
+export function sendWelcomeEmail(user: unknown): void {}
+export function sendPasswordReset(user: unknown, token: string): void {}
+export function sendOrderConfirmation(order: unknown): void {}
+EOF
+
+# Create src/reports.ts
+cat > src/reports.ts << 'EOF'
+// Reporting module
+export function dailySalesReport(date: string): void {}
+export function customerActivityReport(customerId: string, startDate: string, endDate: string): void {}
+export function inventoryReport(): void {}
+EOF
+```
+
+Now start a fresh Claude Code session:
+```bash
+claude
+```
+
+First, check your baseline:
+```
+/cost
+```
+
+Note the number. Now ask Claude to read everything:
+```
+Read every file in the src/ directory and give me a one-paragraph summary of what each module does.
+```
+
+After it finishes:
+```
+/cost
+```
+
+**Observe:** Each file read adds to the context. The delta shows exactly how many tokens those reads cost.
+
+Now run:
+```
+/compact
+```
+
+Then `/cost` again.
+
+**Observe:** Tokens drop significantly. Claude has replaced the full conversation history with a compressed summary, but it still knows what it was doing.
+
+**What to experiment with:**
+- Ask a follow-up question after `/compact` — does Claude still have the context it needs?
+- Try `/clear` instead of `/compact` and compare: compact preserves the task summary, clear wipes everything
+- Create a very large file (copy-paste the contents of any 3 files into a new `src/combined.ts`) and check how much one large file read costs
+
+---
+
 ## 4. Strategies for Managing Context
 
 Managing context is an art and a science. Different strategies suit different situations. Here are the core patterns used in production agentic systems.
@@ -431,6 +501,214 @@ The clean version is 1/10 the size but conveys the same information, because it 
 
 ---
 
+**Exercise 5-B: CLAUDE.md as Context Architecture**
+
+**Goal:** Understand how CLAUDE.md size affects every single session, and how to keep it lean.
+
+**Setup:** You need two versions of CLAUDE.md to compare. First, make your current CLAUDE.md intentionally bloated.
+
+Replace your `CLAUDE.md` with this verbose version:
+
+```markdown
+# Task Manager API — Comprehensive Developer Guide
+
+## Project Overview
+This is a comprehensive task management API built with TypeScript. The project aims to provide a robust, scalable, and maintainable solution for managing tasks, users, billing, and notifications. The codebase follows object-oriented principles and is designed with extensibility in mind.
+
+## Architecture
+The project uses a modular architecture where each concern is separated into its own module. The src/ directory contains the core business logic, while tests co-locate with source files using Jest. We follow the single responsibility principle throughout the codebase.
+
+## Complete Coding Conventions
+- Use camelCase for all variable names and function names
+- Use PascalCase for class names and type names
+- All public functions must have a comment explaining what they do
+- All functions should be under 20 lines; if longer, extract helper functions
+- Never use global variables; pass dependencies as parameters
+- Never use `console.log` for logging; use the logger module
+- All database queries must go through the DB module, never use raw SQL
+- Never hardcode credentials; use environment variables
+- Always handle errors with try/catch, never let exceptions propagate uncaught
+- Write at least one test per public function
+- Tests should be deterministic; never use sleep() in tests
+- Use descriptive variable names; single-letter variables are only acceptable in short loops
+
+## Development Workflow
+- Always run tests before committing
+- Use conventional commit messages: feat:, fix:, docs:, refactor:, test:
+- Create a feature branch for each new feature
+- Request code review before merging
+- Update the CHANGELOG.md with every significant change
+
+## What Claude Should Never Do
+- Modify production config files
+- Delete any data without explicit confirmation
+- Add npm packages without checking with the team
+- Push directly to main branch
+```
+
+Start a fresh session and check the baseline cost:
+```
+/cost
+```
+
+Now replace CLAUDE.md with a lean version:
+
+```markdown
+# Task Manager API
+
+## Critical Rules
+- Never delete data — archive only
+- No raw SQL — use DB module
+- No hardcoded credentials — use ENV
+- Tests required for all public functions
+
+## Commands
+- Tests: `npx jest`
+
+## Conventions
+- See `docs/CONVENTIONS.md` for full style guide (read on demand)
+```
+
+Create `docs/CONVENTIONS.md` with all the verbose content from before (so nothing is lost, just moved):
+
+```markdown
+# Detailed Coding Conventions
+
+## Variable and Function Naming
+- Use camelCase for all variable names and function names
+- Use PascalCase for class names and type names
+
+## Function Design
+- All public functions must have a comment explaining what they do
+- All functions should be under 20 lines; if longer, extract helper functions
+- Use descriptive variable names; single-letter variables are only acceptable in short loops
+
+## Code Patterns
+- Never use global variables; pass dependencies as parameters
+- Never use `console.log` for logging; use the logger module
+- All database queries must go through the DB module, never use raw SQL
+- Never hardcode credentials; use environment variables
+- Always handle errors with try/catch, never let exceptions propagate uncaught
+
+## Testing
+- Write at least one test per public function
+- Tests should be deterministic; never use sleep() in tests
+
+## Development Workflow
+- Always run tests before committing
+- Use conventional commit messages: feat:, fix:, docs:, refactor:, test:
+- Create a feature branch for each new feature
+- Request code review before merging
+- Update the CHANGELOG.md with every significant change
+
+## Guardrails
+- Never modify production config files without explicit approval
+- Never delete data — archive only
+- Never add npm packages without checking with the team
+- Never push directly to main branch
+```
+
+Start a fresh session and check baseline cost again:
+```
+/cost
+```
+
+**Observe:** The lean CLAUDE.md has a noticeably lower baseline token count — and this difference applies to every single API call made in every session.
+
+**What to experiment with:**
+- Ask Claude "What are the coding conventions for this project?" — it reads `docs/CONVENTIONS.md` on demand instead of always loading it
+- Measure how much the baseline drops when you halve your CLAUDE.md
+- Add the instruction "If asked about architecture, read docs/ARCHITECTURE.md" — Claude will only read that file when needed
+
+---
+
+**Exercise 5-E: Greedy vs. Lean Agent Design**
+
+**Goal:** Design an agent with context efficiency as a first-class constraint, and measure the difference.
+
+**Setup:** Introduce a real bug to fix. Add this buggy function to `src/calculator.rb`:
+
+```bash
+cat > src/calculator.ts << 'EOF'
+export function percentageChange(oldValue: number, newValue: number): number {
+  // BUG: crashes when oldValue is 0
+  return ((newValue - oldValue) / oldValue) * 100;
+}
+EOF
+```
+
+Create the greedy version first:
+
+Create `.claude/agents/greedy-debugger.md`:
+
+```markdown
+---
+name: greedy-debugger
+description: Debugs issues by reading the full codebase context first.
+tools: Read, Glob
+model: sonnet
+---
+
+When debugging, build complete context first:
+1. Read ALL files in src/ to understand the full system
+2. Read ALL test files to understand expected behaviour
+3. Read CLAUDE.md and any documentation
+4. Only then diagnose the issue
+```
+
+Create `.claude/agents/lean-debugger.md`:
+
+```markdown
+---
+name: lean-debugger
+description: Debugs issues by reading minimally — only what's needed to diagnose the specific problem.
+tools: Read, Glob, Grep
+model: sonnet
+---
+
+Debug with the minimum reads necessary:
+1. Read only the file containing the error
+2. If the error references another file, read only that file
+3. Stop reading as soon as you have a hypothesis
+4. State your hypothesis, then verify it — don't keep reading "just in case"
+5. Target: solve this by reading at most 3 files
+
+Before each file read, state: "Reading [file] because [specific reason]."
+```
+
+Check token baseline:
+```
+/cost
+```
+
+Run the greedy debugger:
+```
+Use the greedy-debugger to find and fix the bug in the percentage_change function
+```
+```
+/cost
+```
+
+Fresh session, then run the lean debugger on the same (unfixed) code:
+```
+/cost
+```
+```
+Use the lean-debugger to find and fix the bug in the percentage_change function
+```
+```
+/cost
+```
+
+**Observe:** The lean debugger solves the same problem (divide by zero when old_value is 0) with dramatically fewer tokens because it reads only `src/calculator.rb` and stops.
+
+**What to experiment with:**
+- Introduce a bug that genuinely requires reading 2 files to diagnose (e.g., a function in `src/billing.rb` that calls a function from `src/calculator.rb` incorrectly) — does the lean debugger still solve it?
+- Add to the lean agent: "If you can't solve it in 3 files, list exactly what you'd need to read next" — a graceful degradation pattern
+- Apply the lean principle to one of your other agents — rewrite its system prompt to be more context-frugal
+
+---
+
 ## 5. Context Management in Multi-Agent Workflows
 
 In multi-agent workflows, each agent gets its own context window. This is actually a feature, not a bug.
@@ -508,6 +786,123 @@ Agent A gets 5K tokens of directly relevant information. Cleaner, faster, cheape
 
 ---
 
+**Exercise 5-D: The Summarizer Agent**
+
+**Goal:** Add a context-efficient summarization layer between data-gathering and analysis to dramatically cut token usage.
+
+**Setup:** Create a set of source files large enough to be meaningful. Run in your terminal:
+
+```bash
+# Create src/middleware.ts
+cat > src/middleware.ts << 'EOF'
+// Request/response middleware pipeline
+// Handles: authentication, rate limiting, request logging, response compression
+// Used by all API endpoints
+
+export function authenticate(request: { headers: Record<string, string> }): boolean {
+  const token = request.headers['authorization']?.split(' ')[1];
+  if (!token) return false;
+  try {
+    jwt.verify(token, process.env.JWT_SECRET!);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function rateLimit(ip: string, limit = 100, window = 3600): boolean {
+  const key = `rate_limit:${ip}`;
+  const count = redis.incr(key);
+  if (count === 1) redis.expire(key, window);
+  return count <= limit;
+}
+EOF
+```
+
+Now create two competing agent designs:
+
+Create `.claude/agents/codebase-scanner.md`:
+
+```markdown
+---
+name: codebase-scanner
+description: Scans the full codebase and writes a structured summary to .claude/codebase-summary.md. Run this BEFORE any analysis agent to save context tokens.
+tools: Read, Write, Glob
+model: haiku
+---
+
+Scan the entire project and write a concise summary to `.claude/codebase-summary.md`:
+
+# Codebase Summary
+## What This Project Does
+[2 sentences max]
+
+## Files and Their Purpose
+[One line per file: `path` — what it does]
+
+## Key Patterns
+[3-5 bullet points: repeated patterns, conventions, important design decisions]
+
+## Entry Points
+[Where to start reading for: API endpoints, database, auth, tests]
+
+Be ruthlessly concise — this file is read by other agents. Every word costs tokens.
+```
+
+Create `.claude/agents/architecture-analyst.md`:
+
+```markdown
+---
+name: architecture-analyst
+description: Analyses project architecture using the codebase summary. Always reads .claude/codebase-summary.md instead of scanning files directly.
+tools: Read
+model: sonnet
+---
+
+Read `.claude/codebase-summary.md` first. Use ONLY that summary unless you need one specific file to answer a question.
+
+Based on the summary:
+1. Identify the top 3 architectural strengths
+2. Identify the top 3 architectural risks or weaknesses
+3. Recommend 2 concrete improvements with rationale
+
+If you need to read a specific file, state which one and why, then read only that file.
+```
+
+Run the two-stage approach:
+```
+/cost
+```
+```
+Use the codebase-scanner to scan and summarize the project.
+```
+```
+Use the architecture-analyst to review the architecture.
+```
+```
+/cost
+```
+
+Now try the naive approach in a fresh session:
+```
+/cost
+```
+```
+Read all the source files and analyze the architecture of this project.
+```
+```
+/cost
+```
+
+**Observe:** The scanner+analyst pipeline uses significantly fewer tokens for the analysis step because the analyst reads a 30-line summary instead of raw source files.
+
+**What to experiment with:**
+- Open `.claude/codebase-summary.md` — is it accurate enough to be useful to a human too?
+- Run the analyst again without re-running the scanner — it still uses the cached summary from the file
+- Ask the analyst a specific question that requires reading one file: "Is the middleware thread-safe?" — watch it minimally expand context
+
+---
+
 ## 6. Hook-Based Memory Persistence
 
 For long-running projects, you need memory that persists across sessions. Hooks provide this capability.
@@ -552,6 +947,73 @@ The pattern uses hooks to maintain project memory:
 4. **Next session**: SessionStart loads the saved files
 
 Result: each session starts with full context of the project, even across day boundaries.
+
+---
+
+**Exercise 5-C: Build a Session Memory System**
+
+**Goal:** Create an agent that gives you a daily briefing and captures what was accomplished — persistent across `/clear` and new sessions.
+
+**Setup:** No extra files needed. The agent creates everything itself.
+
+Create `.claude/agents/session-keeper.md`:
+
+```markdown
+---
+name: session-keeper
+description: Maintains a running log of project work across sessions. Invoke with "start" at the beginning of each day and "end" at the end.
+tools: Read, Write
+model: haiku
+---
+
+You maintain `.claude/session-memory.md` — the project's persistent memory.
+
+**When invoked to START a session:**
+1. Read `.claude/session-memory.md` if it exists
+2. Summarize the last session in 2-3 sentences
+3. List any open questions or blockers from last time
+4. Say: "Good morning. Last session: [summary]. Open items: [list]. What are we working on today?"
+
+**When invoked to END a session:**
+1. Ask: "What did we accomplish today? Any decisions or blockers?"
+2. Wait for the response, then append to `.claude/session-memory.md`:
+
+---
+## Session: [today's date]
+**Completed:** [bullet list]
+**Decisions made:** [bullet list, or "none"]
+**Still open:** [bullet list, or "none"]
+---
+
+**Memory hygiene:** If `.claude/session-memory.md` exceeds 150 lines, summarize entries older than 2 weeks into a single "### Older history" block.
+```
+
+Start a session:
+```
+Use the session-keeper to start today's session. This is our first day — let's work on adding pagination to the task list.
+```
+
+Do some work (ask Claude to implement a `paginate` function in `src/app.rb`):
+```
+Add a paginate function to src/app.rb that splits a list into pages. Function signature: paginate(items, page_size = 10)
+```
+
+End the session:
+```
+Use the session-keeper to end today's session.
+```
+
+Type `/clear` to simulate the next day. Start fresh:
+```
+Use the session-keeper to start today's session.
+```
+
+**Observe:** The agent reads yesterday's notes from the file and briefs you on what was done and what's open — even though the conversation context was cleared.
+
+**What to experiment with:**
+- Run this across 5 real working sessions and open `.claude/session-memory.md` — is it useful?
+- Share the memory file with a teammate and ask them to invoke the session-keeper — they get instant project context
+- Ask: "Use the session-keeper — what decisions have we made about the database?"
 
 ---
 
@@ -750,471 +1212,119 @@ Even if the previous iterations' context grows large, each new iteration starts 
 
 ---
 
-## 9. Hands-On Exercises
+**Exercise 5-F: Intentional Context Overflow and Recovery**
 
-These exercises teach context management through practice. Every exercise is self-contained: all files needed are created as part of the setup, and the learner starts with the baseline project from Chapters 1-3 (with `src/`, `test/`, `CLAUDE.md`, and `.claude/agents/`).
+**Goal:** Deliberately overflow the context, observe the symptoms firsthand, then apply `/compact` and a summarizer agent to recover — and compare output quality before and after.
 
----
+**Setup:** No extra files needed beyond the existing project. This exercise uses content you already have.
 
-**Exercise 5-A: Feel the Context Fill Up**
-
-**Goal:** Directly observe context growing and learn to manage it with `/cost` and `/compact`.
-
-**Setup:** Add several files to the project so there's something to read. Run these commands in your terminal to create stub files:
-
-```bash
-# Create src/billing.ts
-cat > src/billing.ts << 'EOF'
-// Billing module
-export function calculateInvoice(orderId: string): void {}
-export function applyDiscount(invoice: unknown, code: string): void {}
-export function sendInvoiceEmail(invoice: unknown, customer: unknown): void {}
-EOF
-
-# Create src/notifications.ts
-cat > src/notifications.ts << 'EOF'
-// Notifications module
-export function sendWelcomeEmail(user: unknown): void {}
-export function sendPasswordReset(user: unknown, token: string): void {}
-export function sendOrderConfirmation(order: unknown): void {}
-EOF
-
-# Create src/reports.ts
-cat > src/reports.ts << 'EOF'
-// Reporting module
-export function dailySalesReport(date: string): void {}
-export function customerActivityReport(customerId: string, startDate: string, endDate: string): void {}
-export function inventoryReport(): void {}
-EOF
-```
-
-Now start a fresh Claude Code session:
+Start a fresh Claude Code session:
 ```bash
 claude
 ```
 
-First, check your baseline:
+Check the baseline token count:
 ```
 /cost
 ```
 
-Note the number. Now ask Claude to read everything:
+**Step 1 — Overflow the context deliberately.**
+
+Paste the following prompt (which asks Claude to repeatedly read and re-analyze the same files, inflating the context artificially):
+
 ```
-Read every file in the src/ directory and give me a one-paragraph summary of what each module does.
+I want to do a thorough codebase audit. Please:
+1. Read every file in src/ and describe what each function does in detail
+2. Then read each file again and identify any potential bugs
+3. Then read each file a third time and suggest refactoring improvements
+4. After that, read CLAUDE.md and cross-check every function against every rule
+5. Finally, summarize all findings in a comprehensive report
 ```
 
-After it finishes:
+Let Claude work through this. After it finishes:
 ```
 /cost
 ```
 
-**Observe:** Each file read adds to the context. The delta shows exactly how many tokens those reads cost.
+Note the token count. Then ask a question that tests recall of something said early in the conversation:
+```
+What was the very first file you read, and what did its first function do?
+```
 
-Now run:
+**Observe:** With a bloated context, Claude may give a vague or incorrect answer — the "lost in the middle" effect is at work. Early content is being crowded out by the volume of later tool results.
+
+**Step 2 — Apply `/compact` and re-test.**
+
 ```
 /compact
 ```
 
-Then `/cost` again.
-
-**Observe:** Tokens drop significantly. Claude has replaced the full conversation history with a compressed summary, but it still knows what it was doing.
-
-**What to experiment with:**
-- Ask a follow-up question after `/compact` — does Claude still have the context it needs?
-- Try `/clear` instead of `/compact` and compare: compact preserves the task summary, clear wipes everything
-- Create a very large file (copy-paste the contents of any 3 files into a new `src/combined.ts`) and check how much one large file read costs
-
----
-
-**Exercise 5-B: CLAUDE.md as Context Architecture**
-
-**Goal:** Understand how CLAUDE.md size affects every single session, and how to keep it lean.
-
-**Setup:** You need two versions of CLAUDE.md to compare. First, make your current CLAUDE.md intentionally bloated.
-
-Replace your `CLAUDE.md` with this verbose version:
-
-```markdown
-# Task Manager API — Comprehensive Developer Guide
-
-## Project Overview
-This is a comprehensive task management API built with TypeScript. The project aims to provide a robust, scalable, and maintainable solution for managing tasks, users, billing, and notifications. The codebase follows object-oriented principles and is designed with extensibility in mind.
-
-## Architecture
-The project uses a modular architecture where each concern is separated into its own module. The src/ directory contains the core business logic, while tests co-locate with source files using Jest. We follow the single responsibility principle throughout the codebase.
-
-## Complete Coding Conventions
-- Use camelCase for all variable names and function names
-- Use PascalCase for class names and type names
-- All public functions must have a comment explaining what they do
-- All functions should be under 20 lines; if longer, extract helper functions
-- Never use global variables; pass dependencies as parameters
-- Never use `console.log` for logging; use the logger module
-- All database queries must go through the DB module, never use raw SQL
-- Never hardcode credentials; use environment variables
-- Always handle errors with try/catch, never let exceptions propagate uncaught
-- Write at least one test per public function
-- Tests should be deterministic; never use sleep() in tests
-- Use descriptive variable names; single-letter variables are only acceptable in short loops
-
-## Development Workflow
-- Always run tests before committing
-- Use conventional commit messages: feat:, fix:, docs:, refactor:, test:
-- Create a feature branch for each new feature
-- Request code review before merging
-- Update the CHANGELOG.md with every significant change
-
-## What Claude Should Never Do
-- Modify production config files
-- Delete any data without explicit confirmation
-- Add npm packages without checking with the team
-- Push directly to main branch
-```
-
-Start a fresh session and check the baseline cost:
+Once compaction completes:
 ```
 /cost
 ```
 
-Now replace CLAUDE.md with a lean version:
-
-```markdown
-# Task Manager API
-
-## Critical Rules
-- Never delete data — archive only
-- No raw SQL — use DB module
-- No hardcoded credentials — use ENV
-- Tests required for all public functions
-
-## Commands
-- Tests: `npx jest`
-
-## Conventions
-- See `docs/CONVENTIONS.md` for full style guide (read on demand)
+Note the token count drop. Now ask the same recall question:
+```
+What was the very first file you read, and what did its first function do?
 ```
 
-Create `docs/CONVENTIONS.md` with all the verbose content from before (so nothing is lost, just moved):
+**Observe:** After compaction the answer may be cleaner, but some detail will inevitably be lost — compaction trades fidelity for efficiency. This is the trade-off.
 
-```markdown
-# Detailed Coding Conventions
+**Step 3 — Use a summarizer agent for structured recovery.**
 
-## Variable and Function Naming
-- Use camelCase for all variable names and function names
-- Use PascalCase for class names and type names
-
-## Function Design
-- All public functions must have a comment explaining what they do
-- All functions should be under 20 lines; if longer, extract helper functions
-- Use descriptive variable names; single-letter variables are only acceptable in short loops
-
-## Code Patterns
-- Never use global variables; pass dependencies as parameters
-- Never use `console.log` for logging; use the logger module
-- All database queries must go through the DB module, never use raw SQL
-- Never hardcode credentials; use environment variables
-- Always handle errors with try/catch, never let exceptions propagate uncaught
-
-## Testing
-- Write at least one test per public function
-- Tests should be deterministic; never use sleep() in tests
-
-## Development Workflow
-- Always run tests before committing
-- Use conventional commit messages: feat:, fix:, docs:, refactor:, test:
-- Create a feature branch for each new feature
-- Request code review before merging
-- Update the CHANGELOG.md with every significant change
-
-## Guardrails
-- Never modify production config files without explicit approval
-- Never delete data — archive only
-- Never add npm packages without checking with the team
-- Never push directly to main branch
-```
-
-Start a fresh session and check baseline cost again:
-```
-/cost
-```
-
-**Observe:** The lean CLAUDE.md has a noticeably lower baseline token count — and this difference applies to every single API call made in every session.
-
-**What to experiment with:**
-- Ask Claude "What are the coding conventions for this project?" — it reads `docs/CONVENTIONS.md` on demand instead of always loading it
-- Measure how much the baseline drops when you halve your CLAUDE.md
-- Add the instruction "If asked about architecture, read docs/ARCHITECTURE.md" — Claude will only read that file when needed
-
----
-
-**Exercise 5-C: Build a Session Memory System**
-
-**Goal:** Create an agent that gives you a daily briefing and captures what was accomplished — persistent across `/clear` and new sessions.
-
-**Setup:** No extra files needed. The agent creates everything itself.
-
-Create `.claude/agents/session-keeper.md`:
+Create `.claude/agents/context-recoverer.md`:
 
 ```markdown
 ---
-name: session-keeper
-description: Maintains a running log of project work across sessions. Invoke with "start" at the beginning of each day and "end" at the end.
+name: context-recoverer
+description: Reads raw tool results or verbose analysis text and distills it into a compact findings report. Use after a context overflow to restore a clean working state.
 tools: Read, Write
 model: haiku
 ---
 
-You maintain `.claude/session-memory.md` — the project's persistent memory.
+You are given a verbose analysis or a set of accumulated tool results that have bloated the context.
 
-**When invoked to START a session:**
-1. Read `.claude/session-memory.md` if it exists
-2. Summarize the last session in 2-3 sentences
-3. List any open questions or blockers from last time
-4. Say: "Good morning. Last session: [summary]. Open items: [list]. What are we working on today?"
+Your job:
+1. Read `.claude/overflow-notes.md` if it exists (raw notes from before the overflow)
+2. Produce a concise findings report saved to `.claude/recovery-summary.md`:
 
-**When invoked to END a session:**
-1. Ask: "What did we accomplish today? Any decisions or blockers?"
-2. Wait for the response, then append to `.claude/session-memory.md`:
+# Recovery Summary
+## Files Reviewed
+[One line per file: name — key finding]
 
----
-## Session: [today's date]
-**Completed:** [bullet list]
-**Decisions made:** [bullet list, or "none"]
-**Still open:** [bullet list, or "none"]
----
+## Bugs Found
+[Bullet list, or "none"]
 
-**Memory hygiene:** If `.claude/session-memory.md` exceeds 150 lines, summarize entries older than 2 weeks into a single "### Older history" block.
+## Refactoring Suggestions
+[Bullet list — top 3 only]
+
+## Rules Violations (vs. CLAUDE.md)
+[Bullet list, or "none"]
+
+Be ruthlessly brief. Every line of this file costs tokens in future requests.
 ```
 
-Start a session:
+Before running the agent, save any raw notes Claude produced during the overflow to a file:
 ```
-Use the session-keeper to start today's session. This is our first day — let's work on adding pagination to the task list.
-```
-
-Do some work (ask Claude to implement a `paginate` function in `src/app.rb`):
-```
-Add a paginate function to src/app.rb that splits a list into pages. Function signature: paginate(items, page_size = 10)
+Save a brief summary of everything you found during the audit to .claude/overflow-notes.md
 ```
 
-End the session:
+Then invoke the recoverer:
 ```
-Use the session-keeper to end today's session.
-```
-
-Type `/clear` to simulate the next day. Start fresh:
-```
-Use the session-keeper to start today's session.
+Use the context-recoverer to produce a clean recovery summary from the audit.
 ```
 
-**Observe:** The agent reads yesterday's notes from the file and briefs you on what was done and what's open — even though the conversation context was cleared.
+```
+/cost
+```
+
+**Observe:** The recovery summary is a fraction of the original token cost. Open `.claude/recovery-summary.md` — it should contain the essential findings in a scannable format that can seed future sessions without the overhead.
 
 **What to experiment with:**
-- Run this across 5 real working sessions and open `.claude/session-memory.md` — is it useful?
-- Share the memory file with a teammate and ask them to invoke the session-keeper — they get instant project context
-- Ask: "Use the session-keeper — what decisions have we made about the database?"
-
----
-
-**Exercise 5-D: The Summarizer Agent**
-
-**Goal:** Add a context-efficient summarization layer between data-gathering and analysis to dramatically cut token usage.
-
-**Setup:** Create a set of source files large enough to be meaningful. Run in your terminal:
-
-```bash
-# Create src/middleware.ts
-cat > src/middleware.ts << 'EOF'
-// Request/response middleware pipeline
-// Handles: authentication, rate limiting, request logging, response compression
-// Used by all API endpoints
-
-export function authenticate(request: { headers: Record<string, string> }): boolean {
-  const token = request.headers['authorization']?.split(' ')[1];
-  if (!token) return false;
-  try {
-    jwt.verify(token, process.env.JWT_SECRET!);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function rateLimit(ip: string, limit = 100, window = 3600): boolean {
-  const key = `rate_limit:${ip}`;
-  const count = redis.incr(key);
-  if (count === 1) redis.expire(key, window);
-  return count <= limit;
-}
-EOF
-```
-
-Now create two competing agent designs:
-
-Create `.claude/agents/codebase-scanner.md`:
-
-```markdown
----
-name: codebase-scanner
-description: Scans the full codebase and writes a structured summary to .claude/codebase-summary.md. Run this BEFORE any analysis agent to save context tokens.
-tools: Read, Write, Glob
-model: haiku
----
-
-Scan the entire project and write a concise summary to `.claude/codebase-summary.md`:
-
-# Codebase Summary
-## What This Project Does
-[2 sentences max]
-
-## Files and Their Purpose
-[One line per file: `path` — what it does]
-
-## Key Patterns
-[3-5 bullet points: repeated patterns, conventions, important design decisions]
-
-## Entry Points
-[Where to start reading for: API endpoints, database, auth, tests]
-
-Be ruthlessly concise — this file is read by other agents. Every word costs tokens.
-```
-
-Create `.claude/agents/architecture-analyst.md`:
-
-```markdown
----
-name: architecture-analyst
-description: Analyses project architecture using the codebase summary. Always reads .claude/codebase-summary.md instead of scanning files directly.
-tools: Read
-model: sonnet
----
-
-Read `.claude/codebase-summary.md` first. Use ONLY that summary unless you need one specific file to answer a question.
-
-Based on the summary:
-1. Identify the top 3 architectural strengths
-2. Identify the top 3 architectural risks or weaknesses
-3. Recommend 2 concrete improvements with rationale
-
-If you need to read a specific file, state which one and why, then read only that file.
-```
-
-Run the two-stage approach:
-```
-/cost
-```
-```
-Use the codebase-scanner to scan and summarize the project.
-```
-```
-Use the architecture-analyst to review the architecture.
-```
-```
-/cost
-```
-
-Now try the naive approach in a fresh session:
-```
-/cost
-```
-```
-Read all the source files and analyze the architecture of this project.
-```
-```
-/cost
-```
-
-**Observe:** The scanner+analyst pipeline uses significantly fewer tokens for the analysis step because the analyst reads a 30-line summary instead of raw source files.
-
-**What to experiment with:**
-- Open `.claude/codebase-summary.md` — is it accurate enough to be useful to a human too?
-- Run the analyst again without re-running the scanner — it still uses the cached summary from the file
-- Ask the analyst a specific question that requires reading one file: "Is the middleware thread-safe?" — watch it minimally expand context
-
----
-
-**Exercise 5-E: Greedy vs. Lean Agent Design**
-
-**Goal:** Design an agent with context efficiency as a first-class constraint, and measure the difference.
-
-**Setup:** Introduce a real bug to fix. Add this buggy function to `src/calculator.rb`:
-
-```bash
-cat > src/calculator.ts << 'EOF'
-export function percentageChange(oldValue: number, newValue: number): number {
-  // BUG: crashes when oldValue is 0
-  return ((newValue - oldValue) / oldValue) * 100;
-}
-EOF
-```
-
-Create the greedy version first:
-
-Create `.claude/agents/greedy-debugger.md`:
-
-```markdown
----
-name: greedy-debugger
-description: Debugs issues by reading the full codebase context first.
-tools: Read, Glob
-model: sonnet
----
-
-When debugging, build complete context first:
-1. Read ALL files in src/ to understand the full system
-2. Read ALL test files to understand expected behaviour
-3. Read CLAUDE.md and any documentation
-4. Only then diagnose the issue
-```
-
-Create `.claude/agents/lean-debugger.md`:
-
-```markdown
----
-name: lean-debugger
-description: Debugs issues by reading minimally — only what's needed to diagnose the specific problem.
-tools: Read, Glob, Grep
-model: sonnet
----
-
-Debug with the minimum reads necessary:
-1. Read only the file containing the error
-2. If the error references another file, read only that file
-3. Stop reading as soon as you have a hypothesis
-4. State your hypothesis, then verify it — don't keep reading "just in case"
-5. Target: solve this by reading at most 3 files
-
-Before each file read, state: "Reading [file] because [specific reason]."
-```
-
-Check token baseline:
-```
-/cost
-```
-
-Run the greedy debugger:
-```
-Use the greedy-debugger to find and fix the bug in the percentage_change function
-```
-```
-/cost
-```
-
-Fresh session, then run the lean debugger on the same (unfixed) code:
-```
-/cost
-```
-```
-Use the lean-debugger to find and fix the bug in the percentage_change function
-```
-```
-/cost
-```
-
-**Observe:** The lean debugger solves the same problem (divide by zero when old_value is 0) with dramatically fewer tokens because it reads only `src/calculator.rb` and stops.
-
-**What to experiment with:**
-- Introduce a bug that genuinely requires reading 2 files to diagnose (e.g., a function in `src/billing.rb` that calls a function from `src/calculator.rb` incorrectly) — does the lean debugger still solve it?
-- Add to the lean agent: "If you can't solve it in 3 files, list exactly what you'd need to read next" — a graceful degradation pattern
-- Apply the lean principle to one of your other agents — rewrite its system prompt to be more context-frugal
+- After recovery, start a new session, read `.claude/recovery-summary.md`, and ask Claude to continue the audit — does it have enough context to resume productively?
+- Compare the quality of the `/compact` summary vs. the `context-recoverer` output — which retains more actionable information?
+- Try skipping the overflow step: run the same audit task but check `/cost` every 2 steps and apply `/compact` proactively at 60% — measure whether you get better recall throughout
 
 ---
 
@@ -1234,7 +1344,7 @@ The context management patterns in this chapter are solved at scale by the memor
 
 ---
 
-## 10. Chapter Summary & What's Next
+## 9. Chapter Summary & What's Next
 
 ### Key Takeaways
 
