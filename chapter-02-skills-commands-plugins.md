@@ -113,7 +113,7 @@ Claude summarizes the conversation, extracting essential information and condens
 
 **`/plugin search`** — Searches the plugin registry:
 ```
-> /plugin search ruby
+> /plugin search typescript
 ```
 
 ### Creating Custom Slash Commands
@@ -245,9 +245,9 @@ Adds:
 
 **Language server plugins** — Give Claude the same real-time diagnostics and type-checking your editor has:
 ```
-> /plugin install ruby-lsp@claude-plugins-official       # requires: gem install ruby-lsp
-> /plugin install csharp-lsp@claude-plugins-official     # requires: dotnet tool install --global csharp-ls
-> /plugin install pyright-lsp@claude-plugins-official    # requires: pip install pyright
+> /plugin install typescript-lsp@claude-plugins-official  # requires: npm install -g typescript-language-server
+> /plugin install csharp-lsp@claude-plugins-official      # requires: dotnet tool install --global csharp-ls
+> /plugin install pyright-lsp@claude-plugins-official     # requires: pip install pyright
 ```
 
 **`feature-dev`** — Guides you through a structured 7-phase feature development workflow (Discovery → Exploration → Questions → Architecture → Implementation → Review → Summary):
@@ -328,25 +328,25 @@ mkdir claude-training && cd claude-training && git init
 
 **Goal:** Build the habit of using `/plan`, `/cost`, and `/compact` together on a real task.
 
-**Setup:** Create `src/order_processor.rb` with some code to work with:
-```ruby
-def process_order(items, discount_code)
-  total = 0
-  items.each { |item| total += item[:price] * item[:quantity] }
-  total *= 0.9 if discount_code == "SAVE10"
-  total *= 0.85 if discount_code == "SAVE15"
-  total
-end
+**Setup:** Create `src/orderProcessor.ts` with some code to work with:
+```typescript
+function processOrder(items: Array<{price: number; quantity: number}>, discountCode: string): number {
+  let total = 0;
+  items.forEach(item => { total += item.price * item.quantity; });
+  if (discountCode === "SAVE10") total *= 0.9;
+  if (discountCode === "SAVE15") total *= 0.85;
+  return total;
+}
 
-def apply_tax(amount, region)
-  rate = region == "CA" ? 0.0875 : 0.05
-  amount + (amount * rate)
-end
+function applyTax(amount: number, region: string): number {
+  const rate = region === "CA" ? 0.0875 : 0.05;
+  return amount + amount * rate;
+}
 ```
 
 In Claude Code, type:
 ```
-/plan Refactor process_order to support a configurable discount table instead of hardcoded discount codes, and add input validation
+/plan Refactor processOrder to support a configurable discount table instead of hardcoded discount codes, and add input validation
 ```
 
 **Observe:** Claude produces a plan with phases — it shows what it will change and why, before touching any file. Read the plan carefully: does it make the architecture decisions you would make?
@@ -381,17 +381,17 @@ Now run:
 
 **Goal:** Create a reusable skill that shapes how Claude writes tests, then compare output with and without it.
 
-**Setup:** Create `src/calculator.rb` if it doesn't exist:
-```ruby
-def running_total(transactions)
-  total = 0
-  i = 0
-  while i < transactions.length
-    total += transactions[i]
-    i += 1
-  end
-  total
-end
+**Setup:** Create `src/calculator.ts` if it doesn't exist:
+```typescript
+function runningTotal(transactions: number[]): number {
+  let total = 0;
+  let i = 0;
+  while (i < transactions.length) {
+    total += transactions[i];
+    i++;
+  }
+  return total;
+}
 ```
 
 Create `.claude/skills/write-tests.md`:
@@ -411,7 +411,7 @@ When writing tests:
 
 Now type:
 ```
-Write tests for the running_total function in src/calculator.rb
+Write tests for the runningTotal function in src/calculator.ts
 ```
 
 **Observe:** Claude follows the skill's structured process — reads the function first, writes tests for edge cases, adds descriptive comments above each test.
@@ -433,30 +433,40 @@ Now temporarily rename the skill file (e.g., `write-tests.md.bak`) and run the e
 
 **Setup:** Add a few more files to give the setup analyzer context.
 
-Create `Gemfile`:
-```ruby
-source 'https://rubygems.org'
-ruby '3.2.0'
-
-gem 'sinatra'
-gem 'sqlite3'
-gem 'minitest'
+Create `package.json`:
+```json
+{
+  "name": "claude-training",
+  "version": "1.0.0",
+  "scripts": {
+    "test": "jest",
+    "dev": "ts-node src/app.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "better-sqlite3": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/jest": "^29.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "typescript": "^5.0.0"
+  }
+}
 ```
 
-Create `test/calculator_test.rb`:
-```ruby
-require 'minitest/autorun'
-require_relative '../src/calculator'
+Create `src/calculator.test.ts`:
+```typescript
+import { runningTotal } from './calculator';
 
-class CalculatorTest < Minitest::Test
-  def test_empty_array
-    assert_equal 0, running_total([])
-  end
+test('returns 0 for empty array', () => {
+  expect(runningTotal([])).toBe(0);
+});
 
-  def test_single_item
-    assert_equal 10, running_total([10])
-  end
-end
+test('returns value for single item', () => {
+  expect(runningTotal([10])).toBe(10);
+});
 ```
 
 Install the foundational plugins:
@@ -467,7 +477,7 @@ Install the foundational plugins:
 /plugin install commit-commands@claude-plugins-official
 ```
 ```
-/plugin install ruby-lsp@claude-plugins-official
+/plugin install typescript-lsp@claude-plugins-official
 ```
 ```
 /plugin install feature-dev@claude-plugins-official
@@ -488,7 +498,7 @@ Then let the setup analyzer scan the project:
 Analyse this project and recommend automations.
 ```
 
-**Observe:** Claude detects the Ruby/Sinatra/Minitest stack and recommends specific hooks, MCPs, and workflow patterns tailored to it.
+**Observe:** Claude detects the TypeScript/Express/Jest stack and recommends specific hooks, MCPs, and workflow patterns tailored to it.
 
 **What to experiment with:**
 - Run `/feature-dev add-health-endpoint` and observe how the 7-phase workflow structures the conversation
@@ -501,7 +511,7 @@ Analyse this project and recommend automations.
 
 **Goal:** Design a skill from scratch for a task you repeat often, then validate it produces consistent output.
 
-**Setup:** No new files needed. Use your existing `src/order_processor.rb` and `src/calculator.rb`.
+**Setup:** No new files needed. Use your existing `src/orderProcessor.ts` and `src/calculator.ts`.
 
 Create `.claude/skills/code-explainer.md`:
 ```markdown
@@ -523,14 +533,14 @@ When explaining code:
 
 Now type:
 ```
-Explain the process_order function in src/order_processor.rb
+Explain the processOrder function in src/orderProcessor.ts
 ```
 
 **Observe:** Claude follows the structured process — produces a consistent format with a "what", "why", input/output descriptions, a complexity rating, and callouts for non-obvious parts.
 
-Run it again on `running_total`:
+Run it again on `runningTotal`:
 ```
-Explain the running_total function in src/calculator.rb
+Explain the runningTotal function in src/calculator.ts
 ```
 
 **Observe:** The output structure is identical even though the functions are very different. That consistency is the value of skills.
@@ -588,7 +598,7 @@ Adds the `code-explainer` skill and `/explain` command to Claude Code.
 
 ## Usage
 /explain
-/explain src/order_processor.rb
+/explain src/orderProcessor.ts
 ```
 
 Go back to your project and install:
@@ -605,7 +615,7 @@ Then:
 
 Type:
 ```
-/explain src/order_processor.rb
+/explain src/orderProcessor.ts
 ```
 
 **Observe:** The same structured explanation from Exercise 2-D, but now invoked through a clean command instead of a free-text prompt.

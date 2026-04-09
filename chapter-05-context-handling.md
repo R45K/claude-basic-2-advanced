@@ -763,28 +763,28 @@ These exercises teach context management through practice. Every exercise is sel
 **Setup:** Add several files to the project so there's something to read. Run these commands in your terminal to create stub files:
 
 ```bash
-# Create src/billing.rb
-cat > src/billing.rb << 'EOF'
-# Billing module
-def calculate_invoice(order_id); end
-def apply_discount(invoice, code); end
-def send_invoice_email(invoice, customer); end
+# Create src/billing.ts
+cat > src/billing.ts << 'EOF'
+// Billing module
+export function calculateInvoice(orderId: string): void {}
+export function applyDiscount(invoice: unknown, code: string): void {}
+export function sendInvoiceEmail(invoice: unknown, customer: unknown): void {}
 EOF
 
-# Create src/notifications.rb
-cat > src/notifications.rb << 'EOF'
-# Notifications module
-def send_welcome_email(user); end
-def send_password_reset(user, token); end
-def send_order_confirmation(order); end
+# Create src/notifications.ts
+cat > src/notifications.ts << 'EOF'
+// Notifications module
+export function sendWelcomeEmail(user: unknown): void {}
+export function sendPasswordReset(user: unknown, token: string): void {}
+export function sendOrderConfirmation(order: unknown): void {}
 EOF
 
-# Create src/reports.rb
-cat > src/reports.rb << 'EOF'
-# Reporting module
-def daily_sales_report(date); end
-def customer_activity_report(customer_id, start_date, end_date); end
-def inventory_report; end
+# Create src/reports.ts
+cat > src/reports.ts << 'EOF'
+// Reporting module
+export function dailySalesReport(date: string): void {}
+export function customerActivityReport(customerId: string, startDate: string, endDate: string): void {}
+export function inventoryReport(): void {}
 EOF
 ```
 
@@ -822,7 +822,7 @@ Then `/cost` again.
 **What to experiment with:**
 - Ask a follow-up question after `/compact` — does Claude still have the context it needs?
 - Try `/clear` instead of `/compact` and compare: compact preserves the task summary, clear wipes everything
-- Create a very large file (copy-paste the contents of any 3 files into a new `src/combined.rb`) and check how much one large file read costs
+- Create a very large file (copy-paste the contents of any 3 files into a new `src/combined.ts`) and check how much one large file read costs
 
 ---
 
@@ -838,23 +838,22 @@ Replace your `CLAUDE.md` with this verbose version:
 # Task Manager API — Comprehensive Developer Guide
 
 ## Project Overview
-This is a comprehensive task management API built with Ruby. The project aims to provide a robust, scalable, and maintainable solution for managing tasks, users, billing, and notifications. The codebase follows object-oriented principles and is designed with extensibility in mind.
+This is a comprehensive task management API built with TypeScript. The project aims to provide a robust, scalable, and maintainable solution for managing tasks, users, billing, and notifications. The codebase follows object-oriented principles and is designed with extensibility in mind.
 
 ## Architecture
-The project uses a modular architecture where each concern is separated into its own module. The src/ directory contains the core business logic, while test/ contains unit tests written with Minitest. We follow the single responsibility principle throughout the codebase.
+The project uses a modular architecture where each concern is separated into its own module. The src/ directory contains the core business logic, while tests co-locate with source files using Jest. We follow the single responsibility principle throughout the codebase.
 
 ## Complete Coding Conventions
-- Use snake_case for all variable names, method names, and file names
-- Use CamelCase for class names and module names
-- All public methods must have a comment explaining what they do
-- All methods should be under 20 lines; if longer, extract helper methods
+- Use camelCase for all variable names and function names
+- Use PascalCase for class names and type names
+- All public functions must have a comment explaining what they do
+- All functions should be under 20 lines; if longer, extract helper functions
 - Never use global variables; pass dependencies as parameters
-- Use frozen string literals at the top of every file
-- Never use `puts` for logging; use the logger module
+- Never use `console.log` for logging; use the logger module
 - All database queries must go through the DB module, never use raw SQL
 - Never hardcode credentials; use environment variables
-- Always handle errors with begin/rescue, never let exceptions propagate uncaught
-- Write at least one test per public method
+- Always handle errors with try/catch, never let exceptions propagate uncaught
+- Write at least one test per public function
 - Tests should be deterministic; never use sleep() in tests
 - Use descriptive variable names; single-letter variables are only acceptable in short loops
 
@@ -868,7 +867,7 @@ The project uses a modular architecture where each concern is separated into its
 ## What Claude Should Never Do
 - Modify production config files
 - Delete any data without explicit confirmation
-- Add gems without checking with the team
+- Add npm packages without checking with the team
 - Push directly to main branch
 ```
 
@@ -886,10 +885,10 @@ Now replace CLAUDE.md with a lean version:
 - Never delete data — archive only
 - No raw SQL — use DB module
 - No hardcoded credentials — use ENV
-- Tests required for all public methods
+- Tests required for all public functions
 
 ## Commands
-- Tests: `ruby -Itest test/**/*_test.rb`
+- Tests: `npx jest`
 
 ## Conventions
 - See `docs/CONVENTIONS.md` for full style guide (read on demand)
@@ -900,25 +899,24 @@ Create `docs/CONVENTIONS.md` with all the verbose content from before (so nothin
 ```markdown
 # Detailed Coding Conventions
 
-## Variable and Method Naming
-- Use snake_case for all variable names, method names, and file names
-- Use CamelCase for class names and module names
+## Variable and Function Naming
+- Use camelCase for all variable names and function names
+- Use PascalCase for class names and type names
 
-## Method Design
-- All public methods must have a comment explaining what they do
-- All methods should be under 20 lines; if longer, extract helper methods
+## Function Design
+- All public functions must have a comment explaining what they do
+- All functions should be under 20 lines; if longer, extract helper functions
 - Use descriptive variable names; single-letter variables are only acceptable in short loops
 
 ## Code Patterns
 - Never use global variables; pass dependencies as parameters
-- Use frozen string literals at the top of every file
-- Never use `puts` for logging; use the logger module
+- Never use `console.log` for logging; use the logger module
 - All database queries must go through the DB module, never use raw SQL
 - Never hardcode credentials; use environment variables
-- Always handle errors with begin/rescue, never let exceptions propagate uncaught
+- Always handle errors with try/catch, never let exceptions propagate uncaught
 
 ## Testing
-- Write at least one test per public method
+- Write at least one test per public function
 - Tests should be deterministic; never use sleep() in tests
 
 ## Development Workflow
@@ -931,7 +929,7 @@ Create `docs/CONVENTIONS.md` with all the verbose content from before (so nothin
 ## Guardrails
 - Never modify production config files without explicit approval
 - Never delete data — archive only
-- Never add gems without checking with the team
+- Never add npm packages without checking with the team
 - Never push directly to main branch
 ```
 
@@ -1023,29 +1021,29 @@ Use the session-keeper to start today's session.
 **Setup:** Create a set of source files large enough to be meaningful. Run in your terminal:
 
 ```bash
-# Create src/middleware.rb
-cat > src/middleware.rb << 'EOF'
-# Request/response middleware pipeline
-# Handles: authentication, rate limiting, request logging, response compression
-# Used by all API endpoints
+# Create src/middleware.ts
+cat > src/middleware.ts << 'EOF'
+// Request/response middleware pipeline
+// Handles: authentication, rate limiting, request logging, response compression
+// Used by all API endpoints
 
-module Middleware
-  def self.authenticate(request)
-    token = request.headers['Authorization']&.split(' ')&.last
-    return false unless token
-    JWT.decode(token, ENV['JWT_SECRET'])
-    true
-  rescue JWT::DecodeError
-    false
-  end
+export function authenticate(request: { headers: Record<string, string> }): boolean {
+  const token = request.headers['authorization']?.split(' ')[1];
+  if (!token) return false;
+  try {
+    jwt.verify(token, process.env.JWT_SECRET!);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  def self.rate_limit(ip, limit: 100, window: 3600)
-    key = "rate_limit:#{ip}"
-    count = Redis.current.incr(key)
-    Redis.current.expire(key, window) if count == 1
-    count <= limit
-  end
-end
+export function rateLimit(ip: string, limit = 100, window = 3600): boolean {
+  const key = `rate_limit:${ip}`;
+  const count = redis.incr(key);
+  if (count === 1) redis.expire(key, window);
+  return count <= limit;
+}
 EOF
 ```
 
@@ -1140,11 +1138,11 @@ Read all the source files and analyze the architecture of this project.
 **Setup:** Introduce a real bug to fix. Add this buggy function to `src/calculator.rb`:
 
 ```bash
-cat > src/calculator.rb << 'EOF'
-def percentage_change(old_value, new_value)
-  # BUG: crashes when old_value is 0
-  ((new_value - old_value) / old_value) * 100
-end
+cat > src/calculator.ts << 'EOF'
+export function percentageChange(oldValue: number, newValue: number): number {
+  // BUG: crashes when oldValue is 0
+  return ((newValue - oldValue) / oldValue) * 100;
+}
 EOF
 ```
 

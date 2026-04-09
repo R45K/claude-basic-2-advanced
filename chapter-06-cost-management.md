@@ -659,31 +659,31 @@ Use the file-selector with this task: "We need to fix a bug in user authenticati
 
 **Goal:** Calibrate your intuition for cost vs quality by running the same code review task with Haiku, Sonnet, and Opus.
 
-**Setup:** Create a file with a mix of obvious and subtle issues. Create `src/payment_processor.rb`:
-```ruby
-# Payment processing module
-API_KEY = "sk_live_abc123xyz"  # hardcoded production key
+**Setup:** Create a file with a mix of obvious and subtle issues. Create `src/paymentProcessor.ts`:
+```typescript
+// Payment processing module
+const API_KEY = "sk_live_abc123xyz";  // hardcoded production key
 
-def charge_customer(customer_id, amount)
-  # No input validation
-  # No idempotency key — double-charging possible if retried
-  response = HTTP.post("https://api.stripe.com/v1/charges", {
-    amount: amount,
-    customer: customer_id,
-    currency: "usd"
-  }, headers: { "Authorization": "Bearer #{API_KEY}" })
+async function chargeCustomer(customerId: string, amount: number): Promise<boolean> {
+  // No input validation
+  // No idempotency key — double-charging possible if retried
+  const response = await fetch("https://api.stripe.com/v1/charges", {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${API_KEY}` },
+    body: JSON.stringify({ amount, customer: customerId, currency: "usd" })
+  });
 
-  if response.code == 200
-    log_charge(customer_id, amount)
-    return true
-  end
-  false  # silently swallows all errors
-end
+  if (response.status === 200) {
+    logCharge(customerId, amount);
+    return true;
+  }
+  return false;  // silently swallows all errors
+}
 
-def log_charge(id, amount)
-  puts "Charged #{id}: $#{amount}"  # logs to stdout, not a real logger
-  File.open("charges.log", "a") { |f| f.write("#{id},#{amount}\n") }
-end
+function logCharge(id: string, amount: number): void {
+  console.log(`Charged ${id}: $${amount}`);  // logs to stdout, not a real logger
+  fs.appendFileSync("charges.log", `${id},${amount}\n`);
+}
 ```
 
 Create three reviewer agents:
@@ -726,19 +726,19 @@ Run each one in sequence, using `/cost` to measure:
 /cost
 ```
 ```
-Use the haiku-reviewer on src/payment_processor.rb
+Use the haiku-reviewer on src/paymentProcessor.ts
 ```
 ```
 /cost
 ```
 ```
-Use the sonnet-reviewer on src/payment_processor.rb
+Use the sonnet-reviewer on src/paymentProcessor.ts
 ```
 ```
 /cost
 ```
 ```
-Use the opus-reviewer on src/payment_processor.rb
+Use the opus-reviewer on src/paymentProcessor.ts
 ```
 ```
 /cost
@@ -803,7 +803,7 @@ Output only the commit message. Nothing else.
 
 First, stage some changes:
 ```bash
-git add src/payment_processor.rb
+git add src/paymentProcessor.ts
 ```
 
 Then in Claude Code:
@@ -872,13 +872,13 @@ Run both on the same file:
 /cost
 ```
 ```
-Use the bloated-summarizer on src/payment_processor.rb
+Use the bloated-summarizer on src/paymentProcessor.ts
 ```
 ```
 /cost
 ```
 ```
-Use the lean-summarizer on src/payment_processor.rb
+Use the lean-summarizer on src/paymentProcessor.ts
 ```
 ```
 /cost

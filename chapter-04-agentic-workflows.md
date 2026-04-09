@@ -347,13 +347,13 @@ The following exercises teach workflow patterns through Claude Code agents. Each
 
 **Goal:** Build a three-agent chain where each agent picks up where the previous one left off, communicating via files.
 
-**Setup:** Create a new feature stub that the chain will implement. Create `src/search.rb`:
+**Setup:** Create a new feature stub that the chain will implement. Create `src/search.ts`:
 
-```ruby
-# Search module — finds tasks matching a query string
-# TODO: implement search_tasks(query)
-# Should search task titles and descriptions (case-insensitive)
-# Returns array of matching tasks, empty array if none found
+```typescript
+// Search module — finds tasks matching a query string
+// TODO: implement searchTasks(query: string)
+// Should search task titles and descriptions (case-insensitive)
+// Returns array of matching tasks, empty array if none found
 ```
 
 Now create the three agents:
@@ -446,7 +446,7 @@ You review implementations against plans.
 In Claude Code, run the chain step by step:
 
 ```
-Use the feature-planner to plan the implementation of search_tasks in src/search.rb
+Use the feature-planner to plan the implementation of searchTasks in src/search.ts
 ```
 
 Read `.claude/current-plan.md`. Then:
@@ -474,41 +474,41 @@ Use the feature-reviewer to review the implementation
 
 **Goal:** Run three specialist review agents simultaneously and merge their findings into a single document.
 
-**Setup:** Create a file with different types of issues for each reviewer to find. Create `src/invoice_generator.rb`:
+**Setup:** Create a file with different types of issues for each reviewer to find. Create `src/invoiceGenerator.ts`:
 
-```ruby
-# Invoice generator — has performance, style, and security issues intentionally
+```typescript
+// Invoice generator — has performance, style, and security issues intentionally
 
-def generate_invoices(customer_ids)
-  invoices = []
-  customer_ids.each do |id|
-    # N+1 query pattern — performance issue
-    customer = DB.query("SELECT * FROM customers WHERE id = #{id}")
-    orders = DB.query("SELECT * FROM orders WHERE customer_id = #{id}")
+function generateInvoices(customerIds: string[]) {
+  const invoices = [];
+  for (const id of customerIds) {
+    // N+1 query pattern — performance issue
+    const customer = DB.query(`SELECT * FROM customers WHERE id = ${id}`);
+    const orders = DB.query(`SELECT * FROM orders WHERE customer_id = ${id}`);
 
-    # Method is 40+ lines — style issue
-    total = 0
-    tax = 0
-    discount = 0
-    orders.each do |o|
-      items = DB.query("SELECT * FROM order_items WHERE order_id = #{o['id']}")  # another N+1
-      items.each do |item|
-        total += item['price'] * item['quantity']
-        if item['taxable'] == 1
-          tax += item['price'] * item['quantity'] * 0.1
-        end
-        if customer['loyalty_years'].to_i > 3
-          discount += item['price'] * item['quantity'] * 0.05
-        end
-      end
-    end
+    // Function is 40+ lines — style issue
+    let total = 0;
+    let tax = 0;
+    let discount = 0;
+    for (const o of orders) {
+      const items = DB.query(`SELECT * FROM order_items WHERE order_id = ${o.id}`);  // another N+1
+      for (const item of items) {
+        total += item.price * item.quantity;
+        if (item.taxable === 1) {
+          tax += item.price * item.quantity * 0.1;
+        }
+        if (parseInt(customer.loyaltyYears) > 3) {
+          discount += item.price * item.quantity * 0.05;
+        }
+      }
+    }
 
-    # No authorization — any caller can generate any customer's invoice
-    # SQL injection via string interpolation — security issue
-    invoices << { customer: customer, total: total + tax - discount }
-  end
-  invoices
-end
+    // No authorization — any caller can generate any customer's invoice
+    // SQL injection via string interpolation — security issue
+    invoices.push({ customer, total: total + tax - discount });
+  }
+  return invoices;
+}
 ```
 
 Create `.claude/agents/performance-reviewer.md`:
@@ -551,7 +551,7 @@ Check for: methods over 20 lines, poor naming, deep nesting, magic numbers, miss
 In Claude Code:
 
 ```
-Run the performance-reviewer and style-reviewer in parallel on src/invoice_generator.rb, then compile all findings into a single file at .claude/audit-report.md, grouped by category and sorted by severity.
+Run the performance-reviewer and style-reviewer in parallel on src/invoiceGenerator.ts, then compile all findings into a single file at .claude/audit-report.md, grouped by category and sorted by severity.
 ```
 
 **Observe:** Claude delegates to both agents. Each runs independently with its own context. The orchestrating Claude collects their outputs and writes the merged report.
@@ -567,50 +567,47 @@ Run the performance-reviewer and style-reviewer in parallel on src/invoice_gener
 
 **Goal:** Build an agent that loops until its code passes tests — entirely autonomously.
 
-**Setup:** Create a stub function with failing tests. Create `src/roman_numerals.rb`:
+**Setup:** Create a stub function with failing tests. Create `src/romanNumerals.ts`:
 
-```ruby
-# Converts an integer (1-3999) to a Roman numeral string
-# Examples: 1 => "I", 4 => "IV", 9 => "IX", 14 => "XIV", 1994 => "MCMXCIV"
-# Returns nil for out-of-range input
-def to_roman(number)
-  # TODO: implement
-  nil
-end
+```typescript
+// Converts an integer (1-3999) to a Roman numeral string
+// Examples: 1 => "I", 4 => "IV", 9 => "IX", 14 => "XIV", 1994 => "MCMXCIV"
+// Returns null for out-of-range input
+export function toRoman(number: number): string | null {
+  // TODO: implement
+  return null;
+}
 ```
 
-Create `test/roman_numerals_test.rb`:
+Create `src/romanNumerals.test.ts`:
 
-```ruby
-require 'minitest/autorun'
-require_relative '../src/roman_numerals'
+```typescript
+import { toRoman } from './romanNumerals';
 
-class RomanNumeralsTest < Minitest::Test
-  def test_simple_values
-    assert_equal "I", to_roman(1)
-    assert_equal "V", to_roman(5)
-    assert_equal "X", to_roman(10)
-  end
+test('converts simple values', () => {
+  expect(toRoman(1)).toBe("I");
+  expect(toRoman(5)).toBe("V");
+  expect(toRoman(10)).toBe("X");
+});
 
-  def test_subtractive_notation
-    assert_equal "IV", to_roman(4)
-    assert_equal "IX", to_roman(9)
-    assert_equal "XL", to_roman(40)
-    assert_equal "XC", to_roman(90)
-  end
+test('handles subtractive notation', () => {
+  expect(toRoman(4)).toBe("IV");
+  expect(toRoman(9)).toBe("IX");
+  expect(toRoman(40)).toBe("XL");
+  expect(toRoman(90)).toBe("XC");
+});
 
-  def test_complex_numbers
-    assert_equal "XIV", to_roman(14)
-    assert_equal "XLII", to_roman(42)
-    assert_equal "MCMXCIV", to_roman(1994)
-  end
+test('converts complex numbers', () => {
+  expect(toRoman(14)).toBe("XIV");
+  expect(toRoman(42)).toBe("XLII");
+  expect(toRoman(1994)).toBe("MCMXCIV");
+});
 
-  def test_edge_cases
-    assert_nil to_roman(0)
-    assert_nil to_roman(4000)
-    assert_nil to_roman(-1)
-  end
-end
+test('returns null for out-of-range input', () => {
+  expect(toRoman(0)).toBeNull();
+  expect(toRoman(4000)).toBeNull();
+  expect(toRoman(-1)).toBeNull();
+});
 ```
 
 Create `.claude/agents/tdd-implementer.md`:
@@ -627,7 +624,7 @@ Your job: make all tests pass. Your loop:
 
 1. Read the stub file and the test file
 2. Write an implementation
-3. Run: `ruby test/roman_numerals_test.rb`
+3. Run: `npx jest src/romanNumerals.test.ts`
 4. If tests fail:
    - Read every failure message carefully
    - Identify the specific case your implementation gets wrong
@@ -638,20 +635,20 @@ Your job: make all tests pass. Your loop:
 
 Rules:
 - Never modify the test file
-- Use only Ruby standard library
+- Use only the TypeScript standard library
 - Stop and explain if you cannot pass all tests after 5 attempts
 ```
 
 In Claude Code:
 
 ```
-Use the tdd-implementer to implement the to_roman function.
+Use the tdd-implementer to implement the toRoman function.
 ```
 
 **Observe:** The agent writes an implementation, runs tests, reads failure output, fixes specific cases (likely IV, IX subtractive notation fails first), and iterates until all 12 tests pass.
 
 **What to experiment with:**
-- After it succeeds, add a new failing test: `assert_equal "MMXXIV", to_roman(2024)` — ask the agent to make it pass
+- After it succeeds, add a new failing test: `expect(toRoman(2024)).toBe("MMXXIV")` — ask the agent to make it pass
 - Change `model: haiku` — does it solve Roman numerals correctly, or does it need more iterations?
 - Break the implementation deliberately (add a bug back) and ask the agent to fix it from the test failures
 
@@ -751,13 +748,13 @@ claude
 In terminal 1, type:
 
 ```
-Use the tdd-implementer to fully implement the search_tasks function in src/search.rb, writing tests in test/search_test.rb
+Use the tdd-implementer to fully implement the searchTasks function in src/search.ts, writing tests in src/search.test.ts
 ```
 
 In terminal 2, type (simultaneously):
 
 ```
-Use the tdd-implementer to implement a validate_email function in src/string_utils.rb that checks if a string is a valid email address, with tests in test/email_test.rb
+Use the tdd-implementer to implement a validateEmail function in src/stringUtils.ts that checks if a string is a valid email address, with tests in src/email.test.ts
 ```
 
 Both agents run simultaneously on isolated codebases. Let them finish.

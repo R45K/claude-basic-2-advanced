@@ -445,29 +445,29 @@ Use the memory-agent to document what's in the test/ directory.
 
 **Goal:** Create a specialized expert agent and give it vulnerable code to find real issues.
 
-**Setup:** You need code with real, findable security problems. Create `src/user_auth.rb`:
-```ruby
-# User authentication module
-DB_PASSWORD = "admin123"  # hardcoded secret
+**Setup:** You need code with real, findable security problems. Create `src/userAuth.ts`:
+```typescript
+// User authentication module
+const DB_PASSWORD = "admin123";  // hardcoded secret
 
-def login(username, password)
-  # Direct string interpolation — SQL injection vulnerability
-  query = "SELECT * FROM users WHERE username='#{username}' AND password='#{password}'"
-  result = DB.execute(query)
-  result.first
-end
+function login(username: string, password: string) {
+  // Direct string interpolation — SQL injection vulnerability
+  const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
+  const result = DB.execute(query);
+  return result[0];
+}
 
-def get_user_data(user_id)
-  # No authorization check — any user can access any user's data
-  query = "SELECT * FROM users WHERE id=#{user_id}"
-  DB.execute(query).first
-end
+function getUserData(userId: string) {
+  // No authorization check — any user can access any user's data
+  const query = `SELECT * FROM users WHERE id=${userId}`;
+  return DB.execute(query)[0];
+}
 
-def update_email(user_id, new_email)
-  # No input validation on email format
-  # No check that the current user owns this account
-  DB.execute("UPDATE users SET email='#{new_email}' WHERE id=#{user_id}")
-end
+function updateEmail(userId: string, newEmail: string) {
+  // No input validation on email format
+  // No check that the current user owns this account
+  DB.execute(`UPDATE users SET email='${newEmail}' WHERE id=${userId}`);
+}
 ```
 
 Create `.claude/agents/security-reviewer.md`:
@@ -496,7 +496,7 @@ Be direct. Do not soften findings. A developer's career depends on you being hon
 
 In Claude Code:
 ```
-Use the security-reviewer to audit src/user_auth.rb
+Use the security-reviewer to audit src/userAuth.ts
 ```
 
 **Observe:** The agent should find all three issues — SQL injection (×2), hardcoded credential, and missing authorization — with correct severity ratings. Count how many it catches.
@@ -512,24 +512,24 @@ Use the security-reviewer to audit src/user_auth.rb
 
 **Goal:** Use plan mode with an agent to safely refactor code you can review before it changes anything.
 
-**Setup:** Create a file with messy, working code that's a good refactoring target. Create `src/order_processor.rb`:
-```ruby
-def p(o)
-  t = 0
-  o.each do |i|
-    if i["qty"] > 0
-      if i["price"] > 0
-        t = t + (i["qty"] * i["price"])
-        if i["discount"]
-          if i["discount"] > 0
-            t = t - (t * i["discount"] / 100)
-          end
-        end
-      end
-    end
-  end
-  return t
-end
+**Setup:** Create a file with messy, working code that's a good refactoring target. Create `src/orderProcessor.ts`:
+```typescript
+function p(o: any[]): number {
+  let t = 0;
+  for (const i of o) {
+    if (i["qty"] > 0) {
+      if (i["price"] > 0) {
+        t = t + (i["qty"] * i["price"]);
+        if (i["discount"]) {
+          if (i["discount"] > 0) {
+            t = t - (t * i["discount"] / 100);
+          }
+        }
+      }
+    }
+  }
+  return t;
+}
 ```
 
 Create `.claude/agents/refactor-agent.md`:
@@ -556,7 +556,7 @@ Only after receiving confirmation:
 
 In Claude Code:
 ```
-/plan Use the refactor-agent to improve src/order_processor.rb
+/plan Use the refactor-agent to improve src/orderProcessor.ts
 ```
 
 Read the plan. Review it. Then:
@@ -564,7 +564,7 @@ Read the plan. Review it. Then:
 The plan looks good — proceed.
 ```
 
-**Observe:** The agent explains the current code, lists its planned changes (renaming `p` to `calculate_order_total`, extracting the discount logic, flattening the nested conditionals), and waits for your go-ahead before touching anything.
+**Observe:** The agent explains the current code, lists its planned changes (renaming `p` to `calculateOrderTotal`, extracting the discount logic, flattening the nested conditionals), and waits for your go-ahead before touching anything.
 
 **What to experiment with:**
 - After seeing the plan, say "Don't rename the function — only fix the nesting" and see if it respects the constraint
@@ -577,40 +577,37 @@ The plan looks good — proceed.
 
 **Goal:** Build an agent that writes tests, runs them, reads the failures, and fixes them — without you in the loop.
 
-**Setup:** Create a file with a stubbed function that needs an implementation. Create `src/string_utils.rb`:
-```ruby
-# Returns the most frequently occurring word in a string.
-# If there's a tie, returns the word that appears first.
-# Ignores punctuation and is case-insensitive.
-# Returns nil for empty or nil input.
-def most_frequent_word(text)
-  # TODO: implement
-  nil
-end
+**Setup:** Create a file with a stubbed function that needs an implementation. Create `src/stringUtils.ts`:
+```typescript
+// Returns the most frequently occurring word in a string.
+// If there's a tie, returns the word that appears first.
+// Ignores punctuation and is case-insensitive.
+// Returns null for empty or null input.
+export function mostFrequentWord(text: string | null): string | null {
+  // TODO: implement
+  return null;
+}
 ```
 
-Create `test/string_utils_test.rb`:
-```ruby
-require 'minitest/autorun'
-require_relative '../src/string_utils'
+Create `src/stringUtils.test.ts`:
+```typescript
+import { mostFrequentWord } from './stringUtils';
 
-class StringUtilsTest < Minitest::Test
-  def test_basic
-    assert_equal "the", most_frequent_word("the cat sat on the mat")
-  end
+test('returns most frequent word', () => {
+  expect(mostFrequentWord("the cat sat on the mat")).toBe("the");
+});
 
-  def test_case_insensitive
-    assert_equal "hello", most_frequent_word("Hello hello HELLO world")
-  end
+test('is case-insensitive', () => {
+  expect(mostFrequentWord("Hello hello HELLO world")).toBe("hello");
+});
 
-  def test_empty_string
-    assert_nil most_frequent_word("")
-  end
+test('returns null for empty string', () => {
+  expect(mostFrequentWord("")).toBeNull();
+});
 
-  def test_nil_input
-    assert_nil most_frequent_word(nil)
-  end
-end
+test('returns null for null input', () => {
+  expect(mostFrequentWord(null)).toBeNull();
+});
 ```
 
 Create `.claude/agents/test-writer.md`:
@@ -626,7 +623,7 @@ Your workflow is always:
 
 1. Read the stub function and understand its contract from the comments and tests
 2. Write an implementation in the stub file
-3. Run the tests with Bash: `ruby test/string_utils_test.rb`
+3. Run the tests with Bash: `npx jest src/stringUtils.test.ts`
 4. If any tests fail: read the failure message carefully, fix the implementation, run again
 5. Repeat step 4 up to 4 times
 6. Report: what you implemented, which tests pass, and any that still fail
@@ -636,15 +633,15 @@ Do not report success until all 4 tests actually pass. Do not modify the test fi
 
 In Claude Code:
 ```
-Use the test-writer to implement the most_frequent_word function.
+Use the test-writer to implement the mostFrequentWord function.
 ```
 
 **Observe:** The agent reads both files, writes an implementation, runs the tests, reads the failure output if any, fixes the code, and loops until green — all autonomously.
 
 **What to experiment with:**
-- Deliberately make one test incorrect (e.g., assert_equal "cat", most_frequent_word("the cat sat on the mat")) — watch the agent try and eventually give up after 4 retries
+- Deliberately make one test incorrect (e.g., `expect(mostFrequentWord("the cat sat on the mat")).toBe("cat")`) — watch the agent try and eventually give up after 4 retries
 - Add `model: haiku` to the agent — does it still implement correctly on the first try?
-- Add a 5th harder test case to the test file: `assert_equal "one", most_frequent_word("one, two, one! Two. One?")` (requires punctuation stripping)
+- Add a 5th harder test case to the test file: `expect(mostFrequentWord("one, two, one! Two. One?")).toBe("one")` (requires punctuation stripping)
 
 ---
 

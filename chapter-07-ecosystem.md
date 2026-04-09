@@ -37,7 +37,7 @@ You've completed Chapters 1–5 and mastered the fundamentals: agents, skills, c
 - `claude-md-management` — `/revise-claude-md` to keep CLAUDE.md current
 - `hookify` — create rules that intercept dangerous operations
 - `ralph-loop` — self-iterating agent loop for automation
-- Language servers — ruby-lsp, csharp-lsp, pyright-lsp, typescript-lsp, gopls-lsp, rust-analyzer-lsp
+- Language servers — typescript-lsp, csharp-lsp, pyright-lsp, gopls-lsp, rust-analyzer-lsp
 
 ---
 
@@ -63,7 +63,7 @@ Now type:
 
 **What to experiment with:**
 - Install `explanatory-output-style` and ask Claude a question — notice the different response format
-- Install `code-review` and type `/code-review src/app.rb` — see a full code review run
+- Install `code-review` and type `/code-review src/app.ts` — see a full code review run
 - Run `/plugin search authentication` to find plugins for a specific domain
 
 ---
@@ -72,9 +72,9 @@ Now type:
 
 **Goal:** Use commit-commands to streamline the commit → push → PR workflow.
 
-**Setup:** Make a change to a file in your project (edit `src/app.rb` or similar), then stage it:
+**Setup:** Make a change to a file in your project (edit `src/app.ts` or similar), then stage it:
 ```
-git add src/app.rb
+git add src/app.ts
 ```
 
 Install commit-commands:
@@ -296,9 +296,9 @@ I want to add a rate-limiting feature to the task manager API. Use the superpowe
 A good plan looks like:
 ```
 Task 1 (5 min): Add rate_limit config to CLAUDE.md
-Task 2 (3 min): Create test/middleware/rate_limiter_test.rb with failing tests
-Task 3 (4 min): Implement RateLimiter class in src/middleware/rate_limiter.rb
-Task 4 (2 min): Integrate RateLimiter into src/app.rb
+Task 2 (3 min): Create src/middleware/rateLimiter.test.ts with failing tests
+Task 3 (4 min): Implement RateLimiter class in src/middleware/rateLimiter.ts
+Task 4 (2 min): Integrate RateLimiter into src/app.ts
 Task 5 (3 min): Run full test suite, verify coverage
 ```
 
@@ -317,16 +317,16 @@ Task 5 (3 min): Run full test suite, verify coverage
 
 Then type:
 ```
-Use the test-driven-development skill from superpowers to implement a rate_limit? method in src/middleware.rb. Here's the requirement: it should return true if the current user has exceeded their rate limit (100 requests per hour).
+Use the test-driven-development skill from superpowers to implement an isRateLimited function in src/middleware/rateLimiter.ts. Here's the requirement: it should return true if the current user has exceeded their rate limit (100 requests per hour).
 ```
 
 **Observe:** Superpowers forces this sequence:
-1. **RED** — write a failing test first in `test/middleware/rate_limiter_test.rb`
+1. **RED** — write a failing test first in `src/middleware/rateLimiter.test.ts`
    ```
-   it 'returns true if user exceeds 100 requests per hour' do
-     # setup: create a user with 101 requests in the last hour
-     # assertion: rate_limit?(user) == true
-   end
+   test('returns true if user exceeds 100 requests per hour', () => {
+     // setup: create a user with 101 requests in the last hour
+     // assertion: expect(isRateLimited(user)).toBe(true)
+   });
    ```
 2. Run the test — it fails (RED)
 3. **GREEN** — implement the method in `src/middleware.rb`
@@ -352,7 +352,7 @@ If you try to skip "write failing test first," Superpowers will ask "Where's the
 Then type:
 ```
 Use the dispatching-parallel-agents skill to implement these 3 functions simultaneously:
-- paginate_results in src/app.rb (takes query results, returns paginated array)
+- paginate_results in src/app.ts (takes query results, returns paginated array)
 - format_currency in src/billing.rb (takes amount, returns formatted currency string)
 - sanitize_input in src/string_utils.rb (takes string, returns sanitized for HTML)
 ```
@@ -463,28 +463,28 @@ Which of these 5 principles have you already been using in chapters 1-5? Which a
 
 **Goal:** Invoke a specialized agent that knows your language deeply.
 
-**Setup:** Identify your primary language (Ruby, Python, Go, TypeScript, etc.). Copy the language agent from the cloned repo into your project:
+**Setup:** Copy the TypeScript language agent from the cloned repo into your project:
 
 ```bash
-cp everything-claude-code/agents/ruby-reviewer.md .claude/agents/
+cp everything-claude-code/agents/typescript-reviewer.md .claude/agents/
 # (or python-reviewer, go-reviewer, etc.)
 ```
 
 Now you have a specialized agent in your `.claude/agents/` folder. Type:
 ```
-Use the ruby-reviewer to review src/payment_processor.rb and flag any security or performance issues
+Use the typescript-reviewer to review src/paymentProcessor.ts and flag any security or performance issues
 ```
 
-**Observe:** The ruby-reviewer agent has deep Ruby-specific knowledge:
-- Idiomatic patterns (use of blocks, enumerables, safe navigation)
-- Security (mass assignment, SQL injection patterns, sensitive data logging)
-- Performance (N+1 queries, unnecessary allocations, regex inefficiency)
-- Testing patterns (mocking, fixtures, matchers)
+**Observe:** The typescript-reviewer agent has deep TypeScript-specific knowledge:
+- Idiomatic patterns (type narrowing, generics, utility types)
+- Security (injection patterns, unsafe type assertions, sensitive data logging)
+- Performance (unnecessary re-renders, promise chains, memory leaks)
+- Testing patterns (mocking, async tests, type-level tests)
 
 **What to experiment with:**
-- Compare ruby-reviewer output vs your generic code-review from R-1-B — notice the Ruby-specific depth
-- Ask the ruby-reviewer "what would production Ruby look like?" on one of your files
-- Use the ruby-reviewer on test files — it will flag weak test patterns
+- Compare typescript-reviewer output vs your generic code-review from R-1-B — notice the TypeScript-specific depth
+- Ask the typescript-reviewer "what would production TypeScript look like?" on one of your files
+- Use the typescript-reviewer on test files — it will flag weak test patterns
 
 ---
 
@@ -506,7 +506,7 @@ cp everything-claude-code/skills/database-migrations.md .claude/skills/
 
 Now type:
 ```
-Use the tdd skill to add test coverage to src/search.rb. Current coverage is 45%. Target is 85%.
+Use the tdd skill to add test coverage to src/search.ts. Current coverage is 45%. Target is 85%.
 ```
 
 **Observe:** The skill file walks you through:
@@ -659,7 +659,7 @@ In Claude Code, type:
 
 Then type:
 ```
-/sc:research What are the best practices for rate limiting in Ruby web APIs?
+/sc:research What are the best practices for rate limiting in TypeScript/Node.js APIs?
 ```
 
 **Observe:** SuperClaude:
@@ -671,14 +671,14 @@ Then type:
 
 Compare with a naive question without SuperClaude:
 ```
-What are the best practices for rate limiting in Ruby web APIs?
+What are the best practices for rate limiting in TypeScript/Node.js APIs?
 ```
 
 **Observe:** SuperClaude's answer is deeper, cites more sources, covers edge cases.
 
 Experiment with exhaustive depth:
 ```
-/sc:research --depth exhaustive What are production patterns for JWT authentication?
+/sc:research --depth exhaustive What are production patterns for JWT authentication in Node.js?
 ```
 
 **Observe:** Longer, more thorough research with more sources.
@@ -734,7 +734,7 @@ Get a baseline:
 
 Then type:
 ```
-/sc:implement --mode token-efficient Add a simple health check endpoint to src/app.rb
+/sc:implement --mode token-efficient Add a simple health check endpoint to src/app.ts
 ```
 
 **Observe:** SuperClaude in token-efficient mode:
@@ -858,7 +858,7 @@ Use the superpowers planning skill to break down the authentication implementati
 
 **Step 4: Implement** (Layer 2b — Everything-Claude-Code language agent)
 ```
-Use the ruby-reviewer and tdd skill to implement the authentication according to the plan
+Use the typescript-reviewer and tdd skill to implement the authentication according to the plan
 ```
 
 **Observe:** Language-specific agent implements with TDD.
