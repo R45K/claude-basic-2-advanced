@@ -230,9 +230,8 @@ The `claude-plugins-official` registry is the primary source. Key plugins:
 **`claude-code-setup`** — Scans your codebase and recommends plugins, MCPs, hooks, and workflows for your stack.
 ```
 > /plugin install claude-code-setup@claude-plugins-official
-> /setup-analyze
 ```
-Run this first on any new project. It detects your language and framework and gives you a tailored setup checklist.
+After installing, just ask Claude conversationally: "recommend automations for this project" or "what hooks should I use?" It analyzes your project structure and gives you a tailored setup checklist — no slash command needed.
 
 **`commit-commands`** — Automates git workflows.
 ```
@@ -265,9 +264,9 @@ Adds:
 **`claude-md-management`** — Keeps your `CLAUDE.md` accurate as your project evolves:
 ```
 > /plugin install claude-md-management@claude-plugins-official
-> /audit-claude-md
 > /revise-claude-md
 ```
+To audit your CLAUDE.md quality, ask Claude conversationally: "audit my CLAUDE.md files" — this triggers the `claude-md-improver` skill built into the plugin.
 
 ### Suggested Install Order
 
@@ -503,7 +502,7 @@ Analyse this project and recommend automations.
 **What to experiment with:**
 - Run `/feature-dev add-health-endpoint` and observe how the 7-phase workflow structures the conversation
 - Try `/plugin install explanatory-output-style@claude-plugins-official` — notice how Claude's responses become more educational
-- Run `/plugin remove ruby-lsp` then ask Claude to review code for type issues — observe the difference in quality
+- Run `/plugin remove typescript-lsp` then ask Claude to review code for type issues — observe the difference in quality
 
 ---
 
