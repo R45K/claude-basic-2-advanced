@@ -64,7 +64,20 @@ Plan Phase 3: Deprecate session-based auth
 Plan Phase 4: Remove session code and clean up
 ```
 
-You review and approve before any code is written. This is invaluable for large refactors and architectural changes. We'll use this extensively in Chapter 3 when working with agents.
+You review and approve before any code is written. Without planning, Claude might start implementing before fully understanding the constraints — leading to wasted work, missed edge cases, or steps done in the wrong order.
+
+**Always use `/plan` for:**
+- Major refactoring or architectural changes
+- Multi-file changes that could break things if done in the wrong order
+- Database schema changes
+- Security-sensitive changes
+
+**You can skip it for:**
+- Simple, well-defined single-file tasks
+- Exploratory or read-only work (understanding code, researching a library)
+- Quick bug fixes where the change is obvious
+
+Build the habit now — when you start working with agents in Chapter 3, plan mode becomes even more critical because a wrong assumption at step 1 can cascade silently across many files.
 
 **`/review`** — Runs a code review on recent changes or a specific file:
 ```
@@ -139,6 +152,59 @@ This is the simplest form of extensibility — no packaging, no distribution, ju
 
 ---
 
+**Exercise 2-A: Command Mastery**
+
+**Goal:** Build the habit of using `/plan`, `/cost`, and `/compact` together on a real task.
+
+**Setup:** Create `src/orderProcessor.ts` with some code to work with:
+```typescript
+function processOrder(items: Array<{price: number; quantity: number}>, discountCode: string): number {
+  let total = 0;
+  items.forEach(item => { total += item.price * item.quantity; });
+  if (discountCode === "SAVE10") total *= 0.9;
+  if (discountCode === "SAVE15") total *= 0.85;
+  return total;
+}
+
+function applyTax(amount: number, region: string): number {
+  const rate = region === "CA" ? 0.0875 : 0.05;
+  return amount + amount * rate;
+}
+```
+
+In Claude Code, type:
+```
+/plan Refactor processOrder to support a configurable discount table instead of hardcoded discount codes, and add input validation
+```
+
+**Observe:** Claude produces a plan with phases — it shows what it will change and why, before touching any file. Read the plan carefully: does it make the architecture decisions you would make?
+
+Approve the plan:
+```
+Looks good, go ahead.
+```
+
+After Claude implements, run:
+```
+/cost
+```
+
+**Observe:** You now see exactly how many tokens the planning + implementation consumed. Note the split between input and output tokens.
+
+Now run:
+```
+/compact
+```
+
+**Observe:** Claude summarizes the conversation. Run `/cost` again — the token count is lower. But what did `/compact` preserve vs. discard?
+
+**What to experiment with:**
+- Run the same refactor without `/plan` first — compare how Claude approaches it differently
+- Use `/compact` before a task (not after) and observe how a leaner context changes Claude's output
+- Add an entry to your `CLAUDE.md` saying "Always run `/plan` before any refactor" and see if Claude prompts you for it unprompted
+
+---
+
 ## 2. Skills
 
 A skill is a reusable, invocable instruction set stored in `.claude/skills/*.md`. Where a custom slash command in `.claude/commands/` is scoped to your project, a skill is a first-class Claude Code concept with a defined format and ecosystem support.
@@ -205,6 +271,101 @@ Think of a skill as a recipe and an agent as a chef who can follow multiple reci
 ### Available Skills in the Ecosystem
 
 Chapter 7 covers the full ecosystem, but know that community repos like `obra/superpowers` and `affaan-m/everything-claude-code` ship dozens of production-tested skills — test-driven-development, database-migrations, api-design, code-review checklists, and more. You can install them directly or use them as templates for your own.
+
+---
+
+**Exercise 2-B: Your First Skill File**
+
+**Goal:** Create a reusable skill that shapes how Claude writes tests, then compare output with and without it.
+
+**Setup:** Create `src/calculator.ts` if it doesn't exist:
+```typescript
+function runningTotal(transactions: number[]): number {
+  let total = 0;
+  let i = 0;
+  while (i < transactions.length) {
+    total += transactions[i];
+    i++;
+  }
+  return total;
+}
+```
+
+Create `.claude/skills/write-tests.md`:
+```markdown
+---
+name: write-tests
+description: Write tests for any function or class. Use when asked to add test coverage to existing code.
+---
+
+When writing tests:
+1. Read the function under test first — understand its inputs, outputs, edge cases, and failure modes
+2. Write tests covering: the happy path, empty or null inputs, boundary values, and expected errors
+3. Look at existing test files to match the project's testing framework and naming conventions
+4. Add a one-line comment above each test explaining what behaviour it verifies
+5. After writing the tests, check if they would actually catch the bugs they claim to test
+```
+
+Now type:
+```
+Write tests for the runningTotal function in src/calculator.ts
+```
+
+**Observe:** Claude follows the skill's structured process — reads the function first, writes tests for edge cases, adds descriptive comments above each test.
+
+Now temporarily rename the skill file (e.g., `write-tests.md.bak`) and run the exact same prompt again.
+
+**Observe:** Without the skill, Claude's output is less structured. It may skip edge cases, omit comments, or invent a testing framework rather than matching your project's style.
+
+**What to experiment with:**
+- Add `model: haiku` to the frontmatter and re-run — does speed increase? Does quality change?
+- Modify the skill to add: "Always include a test with the maximum realistic input size"
+- Create a second skill `.claude/skills/explain-code.md` that explains any function in plain English, then invoke both on `process_order`
+
+---
+
+**Exercise 2-D: Build a Custom Skill**
+
+**Goal:** Design a skill from scratch for a task you repeat often, then validate it produces consistent output.
+
+**Setup:** No new files needed. Use your existing `src/orderProcessor.ts` and `src/calculator.ts`.
+
+Create `.claude/skills/code-explainer.md`:
+```markdown
+---
+name: code-explainer
+description: Explain any function or class in plain English. Use when asked to explain, document, or describe what code does.
+---
+
+When explaining code:
+1. Read the function or class fully before writing anything
+2. Describe in one sentence what the code does (the "what")
+3. Describe why it exists — what problem it solves (the "why")
+4. List the inputs and what each one represents
+5. Describe the output and what it means
+6. Rate the complexity: Simple / Moderate / Complex, with a one-sentence justification
+7. If there are non-obvious parts (clever logic, edge case handling, performance tricks), call them out explicitly
+8. Keep the explanation accessible to a developer who hasn't seen this code before
+```
+
+Now type:
+```
+Explain the processOrder function in src/orderProcessor.ts
+```
+
+**Observe:** Claude follows the structured process — produces a consistent format with a "what", "why", input/output descriptions, a complexity rating, and callouts for non-obvious parts.
+
+Run it again on `runningTotal`:
+```
+Explain the runningTotal function in src/calculator.ts
+```
+
+**Observe:** The output structure is identical even though the functions are very different. That consistency is the value of skills.
+
+**What to experiment with:**
+- Add an `audience` parameter to the skill: "If the requester specifies an audience (junior / senior / non-technical), adjust vocabulary and depth accordingly"
+- Chain this skill with `write-tests`: explain a function first, then ask Claude to write tests based on that explanation
+- Ask Claude to invoke the skill on a function it finds confusing — does the structured format help it catch its own misunderstandings?
 
 ---
 
@@ -313,119 +474,6 @@ It now appears in `/plugin list` and its skills and commands are available in ev
 
 ---
 
-## 4. Hands-On Exercises
-
-Work through these in order. They build on each other. All exercises continue in the `claude-training` folder from Chapter 1 — or create a new one:
-
-```bash
-mkdir claude-training && cd claude-training && git init
-```
-
----
-
-**Exercise 2-A: Command Mastery**
-
-**Goal:** Build the habit of using `/plan`, `/cost`, and `/compact` together on a real task.
-
-**Setup:** Create `src/orderProcessor.ts` with some code to work with:
-```typescript
-function processOrder(items: Array<{price: number; quantity: number}>, discountCode: string): number {
-  let total = 0;
-  items.forEach(item => { total += item.price * item.quantity; });
-  if (discountCode === "SAVE10") total *= 0.9;
-  if (discountCode === "SAVE15") total *= 0.85;
-  return total;
-}
-
-function applyTax(amount: number, region: string): number {
-  const rate = region === "CA" ? 0.0875 : 0.05;
-  return amount + amount * rate;
-}
-```
-
-In Claude Code, type:
-```
-/plan Refactor processOrder to support a configurable discount table instead of hardcoded discount codes, and add input validation
-```
-
-**Observe:** Claude produces a plan with phases — it shows what it will change and why, before touching any file. Read the plan carefully: does it make the architecture decisions you would make?
-
-Approve the plan:
-```
-Looks good, go ahead.
-```
-
-After Claude implements, run:
-```
-/cost
-```
-
-**Observe:** You now see exactly how many tokens the planning + implementation consumed. Note the split between input and output tokens.
-
-Now run:
-```
-/compact
-```
-
-**Observe:** Claude summarizes the conversation. Run `/cost` again — the token count is lower. But what did `/compact` preserve vs. discard?
-
-**What to experiment with:**
-- Run the same refactor without `/plan` first — compare how Claude approaches it differently
-- Use `/compact` before a task (not after) and observe how a leaner context changes Claude's output
-- Add an entry to your `CLAUDE.md` saying "Always run `/plan` before any refactor" and see if Claude prompts you for it unprompted
-
----
-
-**Exercise 2-B: Your First Skill File**
-
-**Goal:** Create a reusable skill that shapes how Claude writes tests, then compare output with and without it.
-
-**Setup:** Create `src/calculator.ts` if it doesn't exist:
-```typescript
-function runningTotal(transactions: number[]): number {
-  let total = 0;
-  let i = 0;
-  while (i < transactions.length) {
-    total += transactions[i];
-    i++;
-  }
-  return total;
-}
-```
-
-Create `.claude/skills/write-tests.md`:
-```markdown
----
-name: write-tests
-description: Write tests for any function or class. Use when asked to add test coverage to existing code.
----
-
-When writing tests:
-1. Read the function under test first — understand its inputs, outputs, edge cases, and failure modes
-2. Write tests covering: the happy path, empty or null inputs, boundary values, and expected errors
-3. Look at existing test files to match the project's testing framework and naming conventions
-4. Add a one-line comment above each test explaining what behaviour it verifies
-5. After writing the tests, check if they would actually catch the bugs they claim to test
-```
-
-Now type:
-```
-Write tests for the runningTotal function in src/calculator.ts
-```
-
-**Observe:** Claude follows the skill's structured process — reads the function first, writes tests for edge cases, adds descriptive comments above each test.
-
-Now temporarily rename the skill file (e.g., `write-tests.md.bak`) and run the exact same prompt again.
-
-**Observe:** Without the skill, Claude's output is less structured. It may skip edge cases, omit comments, or invent a testing framework rather than matching your project's style.
-
-**What to experiment with:**
-- Add `model: haiku` to the frontmatter and re-run — does speed increase? Does quality change?
-- Modify the skill to add: "Always include a test with the maximum realistic input size"
-- Create a second skill `.claude/skills/explain-code.md` that explains any function in plain English, then invoke both on `process_order`
-
----
-
 **Exercise 2-C: Install Your First Plugin Set**
 
 **Goal:** Bootstrap your project with the right plugins and observe how they extend Claude Code's capabilities.
@@ -505,52 +553,7 @@ Analyse this project and recommend automations.
 
 ---
 
-**Exercise 2-D: Build a Custom Skill**
-
-**Goal:** Design a skill from scratch for a task you repeat often, then validate it produces consistent output.
-
-**Setup:** No new files needed. Use your existing `src/orderProcessor.ts` and `src/calculator.ts`.
-
-Create `.claude/skills/code-explainer.md`:
-```markdown
----
-name: code-explainer
-description: Explain any function or class in plain English. Use when asked to explain, document, or describe what code does.
----
-
-When explaining code:
-1. Read the function or class fully before writing anything
-2. Describe in one sentence what the code does (the "what")
-3. Describe why it exists — what problem it solves (the "why")
-4. List the inputs and what each one represents
-5. Describe the output and what it means
-6. Rate the complexity: Simple / Moderate / Complex, with a one-sentence justification
-7. If there are non-obvious parts (clever logic, edge case handling, performance tricks), call them out explicitly
-8. Keep the explanation accessible to a developer who hasn't seen this code before
-```
-
-Now type:
-```
-Explain the processOrder function in src/orderProcessor.ts
-```
-
-**Observe:** Claude follows the structured process — produces a consistent format with a "what", "why", input/output descriptions, a complexity rating, and callouts for non-obvious parts.
-
-Run it again on `runningTotal`:
-```
-Explain the runningTotal function in src/calculator.ts
-```
-
-**Observe:** The output structure is identical even though the functions are very different. That consistency is the value of skills.
-
-**What to experiment with:**
-- Add an `audience` parameter to the skill: "If the requester specifies an audience (junior / senior / non-technical), adjust vocabulary and depth accordingly"
-- Chain this skill with `write-tests`: explain a function first, then ask Claude to write tests based on that explanation
-- Ask Claude to invoke the skill on a function it finds confusing — does the structured format help it catch its own misunderstandings?
-
----
-
-## 5. Chapter Summary and What's Next
+## 4. Chapter Summary and What's Next
 
 You now have a complete picture of Claude Code's extensibility layer.
 

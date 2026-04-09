@@ -188,95 +188,11 @@ Most agents should have reasonable safeguards to prevent runaway loops and exces
 
 ## 3. Plan Mode — Thinking Before Acting
 
-One of the most powerful techniques for reliable agents is **plan mode**. In Claude Code, you can use the `/plan` command to force Claude to propose a plan before executing any actions.
+Chapter 2 covered `/plan` in the command reference — the mechanics, when to use it, and when to skip it. The short version: always run `/plan` before any non-trivial task.
 
-### What `/plan` Does
+It's worth restating here because plan mode becomes *more* critical as agents take on more work autonomously. When you're guiding Claude step-by-step, a wrong assumption surfaces quickly. When an agent is operating across multiple files and tool calls, that same assumption can silently cascade into dozens of wrong moves before you notice.
 
-When you type `/plan` followed by your goal, Claude will:
-
-1. Read the current state of your project
-2. Think through the steps needed to accomplish your goal
-3. Propose a plan in natural language
-4. Wait for your approval before executing
-
-Example:
-
-```
-/plan
-
-Refactor the authentication module to use OAuth2, update all routes to require authentication,
-and write integration tests for the new system.
-```
-
-Claude might respond with:
-
-```
-I'll help you refactor the authentication system. Here's my plan:
-
-1. Read the current authentication module (auth.ts) to understand the existing implementation
-2. Create a new OAuth2 module with provider configuration
-3. Update the main express server to integrate OAuth2
-4. Scan for all existing routes and add authentication middleware
-5. Create integration tests for the new auth flow
-6. Run tests to verify everything works
-
-This will take about 20 minutes and affect the auth, routes, and test files.
-
-Ready to proceed?
-```
-
-You can then:
-- Approve the plan by typing "yes" or "proceed"
-- Modify it by asking questions ("Should we keep the old auth for backward compatibility?")
-- Reject it and ask for a different approach
-
-### Why This Matters for Complex Tasks
-
-Plan mode addresses a critical problem: without planning, an agent might start implementing before fully understanding the constraints. This leads to:
-
-- Wasted work (implementing something that doesn't fit the architecture)
-- Bugs (missing edge cases that should have been thought through)
-- Inefficient execution (doing things in the wrong order)
-
-By requiring a plan first, you get:
-
-- **Transparency:** You know exactly what the agent will do
-- **Course correction:** You can say "wait, that won't work because..." before work starts
-- **Better results:** The plan forces deep thinking, leading to better implementations
-- **Accountability:** The agent is committed to a plan you approved
-
-### How to Use Plan Mode
-
-The pattern is simple:
-
-```
-1. Type `/plan`
-2. Describe your goal
-3. Read Claude's proposed plan
-4. Provide feedback or approval
-5. If approved, proceed; if not, refine and re-plan
-```
-
-You can also use plan mode inside scripts or longer workflows. The `/plan` command is language-agnostic and works with any task type.
-
-### When Plan Mode Is Essential vs. When to Skip It
-
-**Always use plan mode for:**
-- Major refactoring (changing code architecture, moving files)
-- Multi-file changes that could break things if done in the wrong order
-- Anything involving database schema changes
-- Security-sensitive changes
-- Tasks affecting other team members' work
-
-**You can skip plan mode for:**
-- Simple, well-defined tasks (add a new endpoint, fix a specific bug)
-- Exploratory work (researching a library, understanding code)
-- Iterative improvements where you're guiding each step anyway
-- Quick fixes to single files
-
-### Example: Planning a Database Migration
-
-Here's a realistic example of plan mode in action:
+The habit to build: before handing a complex task to an agent you've defined, run `/plan` first. Let Claude surface its assumptions. Challenge them. Then proceed.
 
 ```
 /plan
@@ -286,225 +202,7 @@ Migrate existing user data to use roles. Update the authentication
 middleware to check roles. Write tests.
 ```
 
-Claude's response might be:
-
-```
-I'll help you add role-based access control. Here's my plan:
-
-1. Create migration file - Add a migration that creates the user_roles table
-   and adds a role_id foreign key to the users table
-
-2. Backfill existing users - Create a data migration that assigns default roles
-   to all existing users (likely "user" role)
-
-3. Update User model - Add a relationship between users and roles, add validation
-
-4. Update authentication - Modify auth middleware to load user roles and
-   attach them to the request object
-
-5. Add authorization checks - Create a middleware that checks user roles
-
-6. Write tests - Unit tests for role model, integration tests for auth flow
-
-This is a major change. I'll do it carefully to avoid data loss.
-
-Ready to proceed?
-```
-
-Now you can ask: "What about existing admins? Should they keep admin status?" or "Should we use an enum instead of a separate table?" This conversation before implementation saves hours of rework.
-
-## 4. Building Agents in Claude Code
-
-Now it's time to build real agents. In Claude Code, agents are defined as markdown files in the `.claude/agents/` directory. Each agent is a reusable component with its own system prompt, available tools, and model selection.
-
-### What Makes a Claude Code Agent
-
-A Claude Code agent is a simple markdown file that specifies:
-
-- **name:** A unique identifier for the agent
-- **description:** What this agent does and when to invoke it
-- **tools:** Which Claude Code tools it has access to (Read, Glob, Grep, Bash, Write, etc.)
-- **model:** The Claude model to use (haiku for fast tasks, sonnet for complex reasoning)
-- **System prompt:** The detailed instructions that shape the agent's behavior
-
-The agent is invoked by typing a prompt like "Use the hello-agent to summarize this project." Claude Code then runs the agent in an isolated context with the specified tools and instructions.
-
-### Agent File Format
-
-An agent markdown file looks like this:
-
-```markdown
----
-name: agent-name
-description: What this agent does and when to invoke it.
-tools: Read, Glob, Grep, Bash
-model: haiku
----
-
-[Your detailed system prompt here]
-```
-
-The YAML front matter (between the `---` markers) defines the agent's metadata. The rest is the system prompt—the detailed instructions Claude uses when running this agent.
-
-Let's build five real agents together.
-
-## 5. Hands-On Exercises: Building Real Agents
-
-### Exercise 3-A: Hello, Subagent
-
-**Goal:** Create your first `.claude/agents/` file, invoke it, and understand how subagents work.
-
-**Setup:** You only need the `claude-training` folder from Chapter 1 (or any folder with a few files in it). No extra setup needed.
-
-Create `.claude/agents/hello-agent.md`:
-```markdown
----
-name: hello-agent
-description: A simple test agent that summarizes what it finds. Use when asked to explore a directory.
-tools: Read, Glob
-model: haiku
----
-
-You are a file explorer. When invoked:
-1. List all files in the current project (use Glob with pattern "**/*")
-2. Write a short paragraph (3-5 sentences) describing what the project appears to be about
-3. Mention the primary language and any frameworks or libraries you can identify
-
-Be concise. Do not read file contents unless the filenames are ambiguous.
-```
-
-In Claude Code:
-```
-Use the hello-agent to summarize this project.
-```
-
-**Observe:** Claude delegates to the subagent which runs in its own context window. The agent sees the file tree, infers the project purpose, and returns a summary. Notice that it uses only Glob — it doesn't read file contents — because that's all it needs.
-
-**What to experiment with:**
-- Change `model: haiku` to `model: sonnet` and re-run — does the description improve?
-- Add `Grep` to the tools list and update the prompt: "Also search for any TODO comments" — see what it finds
-- Change the description to something unrelated (e.g., "Use when asked about databases") and try to invoke it again — notice how the description affects when Claude chooses to use it
-
----
-
-### Exercise 3-B: An Agent With External Memory
-
-**Goal:** Build an agent that persists what it learns across sessions using a file.
-
-**Setup:** No extra files needed — the agent creates its own memory file.
-
-Create `.claude/agents/memory-agent.md`:
-```markdown
----
-name: memory-agent
-description: Explores and documents the project, remembering findings across sessions. Use when you want to build up a knowledge base about this codebase.
-tools: Read, Write, Glob
-model: sonnet
----
-
-You maintain a persistent memory file at `.claude/project-memory.md`.
-
-Every time you are invoked:
-1. Read `.claude/project-memory.md` if it exists — this is your memory from previous sessions
-2. Complete the task you've been asked to do
-3. Append what you learned to `.claude/project-memory.md` using this format:
-
----
-## [Today's date] — [task summary in 5 words]
-**Findings:** [bullet points of what you discovered]
-**Still unknown:** [things you noticed but didn't investigate]
----
-
-If the memory file doesn't exist yet, create it with a header:
-# Project Memory
-*Started: [date]*
-```
-
-In Claude Code:
-```
-Use the memory-agent to document what's in the src/ directory.
-```
-
-After it runs, open `.claude/project-memory.md` and read what it wrote.
-
-Start a fresh session (`/clear`) and run:
-```
-Use the memory-agent to document what's in the test/ directory.
-```
-
-**Observe:** The second invocation reads the first session's notes and builds on them, even though the conversation was cleared.
-
-**What to experiment with:**
-- Ask: "Use the memory-agent — what do you already know about this project?"
-- Add a task: after 5 sessions, ask the agent to "summarise and condense the memory file"
-- Try `/clear` between every invocation — the agent should still accumulate knowledge via the file
-
----
-
-### Exercise 3-C: The Security Reviewer Persona
-
-**Goal:** Create a specialized expert agent and give it vulnerable code to find real issues.
-
-**Setup:** You need code with real, findable security problems. Create `src/userAuth.ts`:
-```typescript
-// User authentication module
-const DB_PASSWORD = "admin123";  // hardcoded secret
-
-function login(username: string, password: string) {
-  // Direct string interpolation — SQL injection vulnerability
-  const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
-  const result = DB.execute(query);
-  return result[0];
-}
-
-function getUserData(userId: string) {
-  // No authorization check — any user can access any user's data
-  const query = `SELECT * FROM users WHERE id=${userId}`;
-  return DB.execute(query)[0];
-}
-
-function updateEmail(userId: string, newEmail: string) {
-  // No input validation on email format
-  // No check that the current user owns this account
-  DB.execute(`UPDATE users SET email='${newEmail}' WHERE id=${userId}`);
-}
-```
-
-Create `.claude/agents/security-reviewer.md`:
-```markdown
----
-name: security-reviewer
-description: Reviews code for security vulnerabilities. Use when asked to audit a file or feature for security issues.
-tools: Read, Glob, Grep
-model: sonnet
----
-
-You are a senior application security engineer. You find vulnerabilities before attackers do.
-
-When reviewing code:
-1. Look specifically for: SQL injection, hardcoded credentials, missing authentication/authorization, lack of input validation, sensitive data exposure
-2. For each finding state:
-   - **What:** name of the vulnerability
-   - **Where:** exact file and line number
-   - **Risk:** why this is dangerous in plain language
-   - **Fix:** the specific change needed
-3. Rate each finding: CRITICAL / HIGH / MEDIUM / LOW
-4. End with a one-line verdict: PASS / NEEDS WORK / FAIL
-
-Be direct. Do not soften findings. A developer's career depends on you being honest.
-```
-
-In Claude Code:
-```
-Use the security-reviewer to audit src/userAuth.ts
-```
-
-**Observe:** The agent should find all three issues — SQL injection (×2), hardcoded credential, and missing authorization — with correct severity ratings. Count how many it catches.
-
-**What to experiment with:**
-- Change `model: haiku` and re-run — does it miss any of the three issues?
-- Add a fourth vulnerability to `user_auth.rb` (e.g., logging the password: `puts "Login attempt: #{password}"`) — does the agent catch it?
-- Ask the agent to "suggest a fully secure rewrite of the login function"
+This upfront conversation — "What about existing admins?" "Should we use an enum instead of a separate table?" — saves hours of rework that would otherwise happen inside an agent loop where you can't intervene as easily.
 
 ---
 
@@ -573,79 +271,79 @@ The plan looks good — proceed.
 
 ---
 
-### Exercise 3-E: The Self-Verifying Agent
+## 4. Building Agents in Claude Code
 
-**Goal:** Build an agent that writes tests, runs them, reads the failures, and fixes them — without you in the loop.
+Now it's time to build real agents. In Claude Code, agents are defined as markdown files in the `.claude/agents/` directory. Each agent is a reusable component with its own system prompt, available tools, and model selection.
 
-**Setup:** Create a file with a stubbed function that needs an implementation. Create `src/stringUtils.ts`:
-```typescript
-// Returns the most frequently occurring word in a string.
-// If there's a tie, returns the word that appears first.
-// Ignores punctuation and is case-insensitive.
-// Returns null for empty or null input.
-export function mostFrequentWord(text: string | null): string | null {
-  // TODO: implement
-  return null;
-}
-```
+### What Makes a Claude Code Agent
 
-Create `src/stringUtils.test.ts`:
-```typescript
-import { mostFrequentWord } from './stringUtils';
+A Claude Code agent is a simple markdown file that specifies:
 
-test('returns most frequent word', () => {
-  expect(mostFrequentWord("the cat sat on the mat")).toBe("the");
-});
+- **name:** A unique identifier for the agent
+- **description:** What this agent does and when to invoke it
+- **tools:** Which Claude Code tools it has access to (Read, Glob, Grep, Bash, Write, etc.)
+- **model:** The Claude model to use (haiku for fast tasks, sonnet for complex reasoning)
+- **System prompt:** The detailed instructions that shape the agent's behavior
 
-test('is case-insensitive', () => {
-  expect(mostFrequentWord("Hello hello HELLO world")).toBe("hello");
-});
+The agent is invoked by typing a prompt like "Use the hello-agent to summarize this project." Claude Code then runs the agent in an isolated context with the specified tools and instructions.
 
-test('returns null for empty string', () => {
-  expect(mostFrequentWord("")).toBeNull();
-});
+### Agent File Format
 
-test('returns null for null input', () => {
-  expect(mostFrequentWord(null)).toBeNull();
-});
-```
+An agent markdown file looks like this:
 
-Create `.claude/agents/test-writer.md`:
 ```markdown
 ---
-name: test-writer
-description: Implements a stubbed function so that all existing tests pass. Runs the tests and fixes failures before finishing. Use when you have a stub function and existing tests.
-tools: Read, Write, Bash
-model: sonnet
+name: agent-name
+description: What this agent does and when to invoke it.
+tools: Read, Glob, Grep, Bash
+model: haiku
 ---
 
-Your workflow is always:
+[Your detailed system prompt here]
+```
 
-1. Read the stub function and understand its contract from the comments and tests
-2. Write an implementation in the stub file
-3. Run the tests with Bash: `npx jest src/stringUtils.test.ts`
-4. If any tests fail: read the failure message carefully, fix the implementation, run again
-5. Repeat step 4 up to 4 times
-6. Report: what you implemented, which tests pass, and any that still fail
+The YAML front matter (between the `---` markers) defines the agent's metadata. The rest is the system prompt—the detailed instructions Claude uses when running this agent.
 
-Do not report success until all 4 tests actually pass. Do not modify the test file.
+---
+
+### Exercise 3-A: Hello, Subagent
+
+**Goal:** Create your first `.claude/agents/` file, invoke it, and understand how subagents work.
+
+**Setup:** You only need the `claude-training` folder from Chapter 1 (or any folder with a few files in it). No extra setup needed.
+
+Create `.claude/agents/hello-agent.md`:
+```markdown
+---
+name: hello-agent
+description: A simple test agent that summarizes what it finds. Use when asked to explore a directory.
+tools: Read, Glob
+model: haiku
+---
+
+You are a file explorer. When invoked:
+1. List all files in the current project (use Glob with pattern "**/*")
+2. Write a short paragraph (3-5 sentences) describing what the project appears to be about
+3. Mention the primary language and any frameworks or libraries you can identify
+
+Be concise. Do not read file contents unless the filenames are ambiguous.
 ```
 
 In Claude Code:
 ```
-Use the test-writer to implement the mostFrequentWord function.
+Use the hello-agent to summarize this project.
 ```
 
-**Observe:** The agent reads both files, writes an implementation, runs the tests, reads the failure output if any, fixes the code, and loops until green — all autonomously.
+**Observe:** Claude delegates to the subagent which runs in its own context window. The agent sees the file tree, infers the project purpose, and returns a summary. Notice that it uses only Glob — it doesn't read file contents — because that's all it needs.
 
 **What to experiment with:**
-- Deliberately make one test incorrect (e.g., `expect(mostFrequentWord("the cat sat on the mat")).toBe("cat")`) — watch the agent try and eventually give up after 4 retries
-- Add `model: haiku` to the agent — does it still implement correctly on the first try?
-- Add a 5th harder test case to the test file: `expect(mostFrequentWord("one, two, one! Two. One?")).toBe("one")` (requires punctuation stripping)
+- Change `model: haiku` to `model: sonnet` and re-run — does the description improve?
+- Add `Grep` to the tools list and update the prompt: "Also search for any TODO comments" — see what it finds
+- Change the description to something unrelated (e.g., "Use when asked about databases") and try to invoke it again — notice how the description affects when Claude chooses to use it
 
 ---
 
-## 6. Subagents — Delegating Work
+## 5. Subagents — Delegating Work
 
 Complex tasks often benefit from delegation. In Claude Code, you can spawn subagents (using the agents you've created) to handle specific subtasks, then observe how they work in parallel or sequence.
 
@@ -699,6 +397,154 @@ list of improvements.
 ```
 
 Each agent runs in turn, and you can review the results. This orchestration approach is simpler and more transparent than trying to build one agent that does everything.
+
+---
+
+### Exercise 3-F: Orchestrate Three Agents
+
+**Goal:** Chain hello-agent, security-reviewer, and refactor-agent together in sequence, passing results from one to the next via file-based state.
+
+**Setup:** You need the `hello-agent.md`, `security-reviewer.md`, and `refactor-agent.md` agent files from the earlier exercises. Ensure `src/userAuth.ts` from Exercise 3-C also exists.
+
+In Claude Code:
+```
+Use the hello-agent to find all TypeScript files in this project and write
+the list to .claude/ts-files.md.
+```
+
+Then:
+```
+Read .claude/ts-files.md. Use the security-reviewer to audit any files
+with "auth" in the name, and write a findings report to
+.claude/security-findings.md.
+```
+
+Then:
+```
+Read .claude/security-findings.md. Use the refactor-agent to clean up
+any file the security reviewer flagged as NEEDS WORK or FAIL.
+```
+
+**Observe:** Each agent reads the output file from the previous step — this is file-based state passing. The hello-agent discovers the project layout; the security-reviewer narrows its focus to auth files; the refactor-agent acts only on what was flagged. No single agent needs to understand the whole pipeline.
+
+**What to experiment with:**
+- Run the sequence again after the refactor-agent finishes — does the security-reviewer now rate the file better?
+- Add a fourth step: "Use the memory-agent to document what all three agents did" — observe how it synthesizes across the output files
+- Deliberately introduce a new vulnerability into `userAuth.ts` mid-sequence and see whether the pipeline catches it on the next run
+
+---
+
+## 6. Agent Teams — Peer Collaboration at Scale
+
+Subagents are hierarchical: a parent delegates a task, a worker completes it and reports back. **Agent teams** flip this model. Instead of one agent orchestrating subordinates, you get a group of fully independent Claude Code sessions working as peers — each with its own context window, communicating directly with each other through a shared task list and mailbox.
+
+> Agent teams are experimental. Enable them by adding `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` to your environment (via `~/.claude/settings.json` or shell config) and ensure you're on Claude Code v2.1.32 or later.
+
+### The Architecture
+
+| Role | What it does |
+|---|---|
+| **Team lead** | Your main Claude Code session. Creates the team, spawns teammates, coordinates. |
+| **Teammates** | Independent Claude Code instances, each with their own context. |
+| **Task list** | Shared, mutable queue of work items. Teammates claim tasks and mark them complete. |
+| **Mailbox** | Async messaging between teammates and the lead. |
+
+### Creating a Team
+
+Describe the goal and ask Claude to form a team:
+
+```
+Create an agent team to investigate this performance regression from three angles:
+one teammate on database query analysis, one on memory profiling, and one playing
+devil's advocate challenging the findings of the other two.
+```
+
+Claude creates the team, distributes the work, and teammates begin in parallel. You can also specify the composition explicitly:
+
+```
+Create a team with 3 teammates using Sonnet. Assign one to the frontend,
+one to the backend, and one to write integration tests.
+```
+
+### Interacting With the Team
+
+In **in-process mode** (single terminal), cycle through teammates with `Shift+Down`. In **tmux/split-pane mode**, each teammate gets its own pane — click in to interact directly.
+
+You can message teammates at any time without going through the lead:
+
+```
+Tell the database teammate to also check for missing indexes on the orders table.
+```
+
+Teammates communicate with each other and with the lead through the mailbox. The shared task list keeps everyone aligned — tasks are self-claimed as teammates finish their current work.
+
+### Subagents vs. Agent Teams
+
+| | Subagents | Agent Teams |
+|---|---|---|
+| **Communication** | Report to parent only | Peer-to-peer + shared task list |
+| **Context** | Focused, subordinate | Independent, full Claude instances |
+| **Coordination** | Parent manages all | Self-coordinating with task queue |
+| **Cost** | Lower (one main session) | Higher (N full Claude instances) |
+| **Best for** | Focused, well-defined delegation | Parallel exploration, debate, cross-layer work |
+
+### When to Use Agent Teams
+
+**Strong fit:**
+- **Parallel investigation** — multiple teammates explore competing hypotheses simultaneously (faster convergence, avoids anchoring bias)
+- **Cross-layer features** — frontend, backend, and tests owned by separate teammates without file conflicts
+- **Review with multiple lenses** — security + performance + test coverage reviewers running at the same time
+
+**Avoid teams when:**
+- Tasks must happen in a specific sequence
+- Multiple teammates would edit the same files
+- You're on a tight token budget — each teammate is a full Claude Code instance
+
+### Quality Gates via Hooks
+
+You can use hooks to enforce standards on the team:
+
+```json
+{
+  "hooks": {
+    "TaskCompleted": "npm test -- --testPathPattern={{task.files}}",
+    "TeammateIdle": "echo 'Check task list before going idle'"
+  }
+}
+```
+
+`TaskCompleted` runs when a teammate marks a task done — exit code 2 blocks completion until it passes. `TeammateIdle` fires when a teammate has no more work, letting you inject additional instructions.
+
+---
+
+### Exercise 3-G: Your First Agent Team
+
+**Goal:** Enable agent teams and observe peer messaging, the shared task list, and parallel investigation in action.
+
+**Setup:** Add `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` to your `~/.claude/settings.json` (or export it in your shell config). Confirm you are on Claude Code v2.1.32 or later with `claude --version`. You will use the TypeScript files from the earlier exercises as the codebase under investigation.
+
+In Claude Code:
+```
+Create a team of 2 teammates to investigate a performance regression in
+this project. Teammate 1 should profile the TypeScript code from the
+earlier exercises — look for algorithmic complexity issues, blocking
+operations, and hot paths. Teammate 2 plays devil's advocate: look for
+performance causes that Teammate 1 might miss or dismiss, including
+environmental factors, dependency overhead, and test-harness overhead.
+Each teammate should write their findings to a separate file under
+.claude/ before reporting back to you.
+```
+
+Watch the shared task list populate. Use `Shift+Down` (in-process mode) to switch between teammates as they work.
+
+**Observe:** The two teammates operate independently and can send each other messages through the mailbox when one discovers something the other should know. The task list shows which items are claimed, in-progress, and complete. After both finish, compare the two findings files — they will often surface complementary issues.
+
+**What to experiment with:**
+- Message Teammate 2 directly: "Also check whether the test setup in stringUtils.test.ts could be inflating runtime" — see how it picks up the new angle mid-flight
+- After both teammates finish, ask the lead: "Synthesize both findings files into a ranked list of the top 3 performance risks"
+- Note the total token usage compared to running a single agent with the same prompt — this is the real cost of peer collaboration
+
+---
 
 ## 7. Specialized Agent Personas
 
@@ -824,6 +670,75 @@ Always provide benchmarks or metrics when possible.
 - The perspective doesn't matter
 - You want balanced, generalist thinking
 
+---
+
+### Exercise 3-C: The Security Reviewer Persona
+
+**Goal:** Create a specialized expert agent and give it vulnerable code to find real issues.
+
+**Setup:** You need code with real, findable security problems. Create `src/userAuth.ts`:
+```typescript
+// User authentication module
+const DB_PASSWORD = "admin123";  // hardcoded secret
+
+function login(username: string, password: string) {
+  // Direct string interpolation — SQL injection vulnerability
+  const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;
+  const result = DB.execute(query);
+  return result[0];
+}
+
+function getUserData(userId: string) {
+  // No authorization check — any user can access any user's data
+  const query = `SELECT * FROM users WHERE id=${userId}`;
+  return DB.execute(query)[0];
+}
+
+function updateEmail(userId: string, newEmail: string) {
+  // No input validation on email format
+  // No check that the current user owns this account
+  DB.execute(`UPDATE users SET email='${newEmail}' WHERE id=${userId}`);
+}
+```
+
+Create `.claude/agents/security-reviewer.md`:
+```markdown
+---
+name: security-reviewer
+description: Reviews code for security vulnerabilities. Use when asked to audit a file or feature for security issues.
+tools: Read, Glob, Grep
+model: sonnet
+---
+
+You are a senior application security engineer. You find vulnerabilities before attackers do.
+
+When reviewing code:
+1. Look specifically for: SQL injection, hardcoded credentials, missing authentication/authorization, lack of input validation, sensitive data exposure
+2. For each finding state:
+   - **What:** name of the vulnerability
+   - **Where:** exact file and line number
+   - **Risk:** why this is dangerous in plain language
+   - **Fix:** the specific change needed
+3. Rate each finding: CRITICAL / HIGH / MEDIUM / LOW
+4. End with a one-line verdict: PASS / NEEDS WORK / FAIL
+
+Be direct. Do not soften findings. A developer's career depends on you being honest.
+```
+
+In Claude Code:
+```
+Use the security-reviewer to audit src/userAuth.ts
+```
+
+**Observe:** The agent should find all three issues — SQL injection (×2), hardcoded credential, and missing authorization — with correct severity ratings. Count how many it catches.
+
+**What to experiment with:**
+- Change `model: haiku` and re-run — does it miss any of the three issues?
+- Add a fourth vulnerability to `user_auth.rb` (e.g., logging the password: `puts "Login attempt: #{password}"`) — does the agent catch it?
+- Ask the agent to "suggest a fully secure rewrite of the login function"
+
+---
+
 ## 8. Common Agent Patterns
 
 Over time, patterns have emerged for building reliable agents. Understanding these patterns helps you design better agents for your specific tasks.
@@ -920,6 +835,80 @@ Pattern:
 ```
 
 This is powerful because the agent gets immediate feedback on whether its work actually works. You see this in Exercise 3-E (test-writer), where the agent runs tests after writing code.
+
+---
+
+### Exercise 3-E: The Self-Verifying Agent
+
+**Goal:** Build an agent that writes tests, runs them, reads the failures, and fixes them — without you in the loop.
+
+**Setup:** Create a file with a stubbed function that needs an implementation. Create `src/stringUtils.ts`:
+```typescript
+// Returns the most frequently occurring word in a string.
+// If there's a tie, returns the word that appears first.
+// Ignores punctuation and is case-insensitive.
+// Returns null for empty or null input.
+export function mostFrequentWord(text: string | null): string | null {
+  // TODO: implement
+  return null;
+}
+```
+
+Create `src/stringUtils.test.ts`:
+```typescript
+import { mostFrequentWord } from './stringUtils';
+
+test('returns most frequent word', () => {
+  expect(mostFrequentWord("the cat sat on the mat")).toBe("the");
+});
+
+test('is case-insensitive', () => {
+  expect(mostFrequentWord("Hello hello HELLO world")).toBe("hello");
+});
+
+test('returns null for empty string', () => {
+  expect(mostFrequentWord("")).toBeNull();
+});
+
+test('returns null for null input', () => {
+  expect(mostFrequentWord(null)).toBeNull();
+});
+```
+
+Create `.claude/agents/test-writer.md`:
+```markdown
+---
+name: test-writer
+description: Implements a stubbed function so that all existing tests pass. Runs the tests and fixes failures before finishing. Use when you have a stub function and existing tests.
+tools: Read, Write, Bash
+model: sonnet
+---
+
+Your workflow is always:
+
+1. Read the stub function and understand its contract from the comments and tests
+2. Write an implementation in the stub file
+3. Run the tests with Bash: `npx jest src/stringUtils.test.ts`
+4. If any tests fail: read the failure message carefully, fix the implementation, run again
+5. Repeat step 4 up to 4 times
+6. Report: what you implemented, which tests pass, and any that still fail
+
+Do not report success until all 4 tests actually pass. Do not modify the test file.
+```
+
+In Claude Code:
+```
+Use the test-writer to implement the mostFrequentWord function.
+```
+
+**Observe:** The agent reads both files, writes an implementation, runs the tests, reads the failure output if any, fixes the code, and loops until green — all autonomously.
+
+**What to experiment with:**
+- Deliberately make one test incorrect (e.g., `expect(mostFrequentWord("the cat sat on the mat")).toBe("cat")`) — watch the agent try and eventually give up after 4 retries
+- Add `model: haiku` to the agent — does it still implement correctly on the first try?
+- Add a 5th harder test case to the test file: `expect(mostFrequentWord("one, two, one! Two. One?")).toBe("one")` (requires punctuation stripping)
+
+---
 
 ## 9. Memory — How Agents Remember Things
 
@@ -1050,6 +1039,62 @@ When agents read this, they understand the project's constraints and conventions
 - **Weaviate:** Open-source vector search engine (flexible, self-hosted)
 - **Milvus:** Another vector database option (self-hosted, highly scalable)
 
+---
+
+### Exercise 3-B: An Agent With External Memory
+
+**Goal:** Build an agent that persists what it learns across sessions using a file.
+
+**Setup:** No extra files needed — the agent creates its own memory file.
+
+Create `.claude/agents/memory-agent.md`:
+```markdown
+---
+name: memory-agent
+description: Explores and documents the project, remembering findings across sessions. Use when you want to build up a knowledge base about this codebase.
+tools: Read, Write, Glob
+model: sonnet
+---
+
+You maintain a persistent memory file at `.claude/project-memory.md`.
+
+Every time you are invoked:
+1. Read `.claude/project-memory.md` if it exists — this is your memory from previous sessions
+2. Complete the task you've been asked to do
+3. Append what you learned to `.claude/project-memory.md` using this format:
+
+---
+## [Today's date] — [task summary in 5 words]
+**Findings:** [bullet points of what you discovered]
+**Still unknown:** [things you noticed but didn't investigate]
+---
+
+If the memory file doesn't exist yet, create it with a header:
+# Project Memory
+*Started: [date]*
+```
+
+In Claude Code:
+```
+Use the memory-agent to document what's in the src/ directory.
+```
+
+After it runs, open `.claude/project-memory.md` and read what it wrote.
+
+Start a fresh session (`/clear`) and run:
+```
+Use the memory-agent to document what's in the test/ directory.
+```
+
+**Observe:** The second invocation reads the first session's notes and builds on them, even though the conversation was cleared.
+
+**What to experiment with:**
+- Ask: "Use the memory-agent — what do you already know about this project?"
+- Add a task: after 5 sessions, ask the agent to "summarise and condense the memory file"
+- Try `/clear` between every invocation — the agent should still accumulate knowledge via the file
+
+---
+
 ## 10. Advanced Patterns for Production Agents
 
 As you build more complex agents, certain patterns emerge that make them more reliable, transparent, and efficient.
@@ -1120,15 +1165,17 @@ You've now learned what agents are, how they work, and how to build them. Let's 
    - Project-level (`CLAUDE.md`)
    - Semantic databases (for scale)
 
-6. **Plan mode** is essential for complex tasks. Always use it before major changes.
+6. **Plan mode** is essential for complex tasks. Always use it before major changes — especially when handing off to an agent that will operate autonomously.
 
-7. **Specialization through personas** produces better agents. A security-focused agent finds different issues than a generic one.
+7. **Agent teams** enable peer collaboration between independent Claude sessions with a shared task list and peer-to-peer mailbox. Use them for parallel investigation and cross-layer work where teammates can explore competing angles simultaneously; avoid them for sequential tasks or tight token budgets, since each teammate is a full Claude Code instance.
 
-8. **Patterns like ReAct, Chain of Thought, Reflection, and Verification** make agents more reliable and transparent.
+8. **Specialization through personas** produces better agents. A security-focused agent finds different issues than a generic one.
 
-9. **Delegation and composition** let you break complex work into focused subtasks handled by specialist agents.
+9. **Patterns like ReAct, Chain of Thought, Reflection, and Verification** make agents more reliable and transparent.
 
-10. **Agents require clear stopping points.** Design them to know when the task is complete and report their findings.
+10. **Delegation and composition** let you break complex work into focused subtasks handled by specialist agents.
+
+11. **Agents require clear stopping points.** Design them to know when the task is complete and report their findings.
 
 ### Common Pitfalls to Avoid
 
@@ -1138,6 +1185,7 @@ You've now learned what agents are, how they work, and how to build them. Let's 
 - **Ignoring errors:** Always handle tool errors gracefully and provide clear error messages
 - **No verification:** Don't assume the agent's work is correct. Have it test its own output
 - **Single agent for everything:** Break work into specialized agents when possible
+- **Agent teams for sequential work:** Teams shine for parallel exploration, not for tasks that must happen in order — the coordination overhead isn't worth it
 
 ### What's Next: Chapter 4
 
