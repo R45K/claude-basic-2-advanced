@@ -309,7 +309,7 @@ Install it locally:
 > /plugin install ./my-plugin
 ```
 
-It now appears in `/plugin list` and its skills and commands are available in every session. Exercise 2-E walks through this in full.
+It now appears in `/plugin list` and its skills and commands are available in every session.
 
 ---
 
@@ -502,7 +502,6 @@ Analyse this project and recommend automations.
 **What to experiment with:**
 - Run `/feature-dev add-health-endpoint` and observe how the 7-phase workflow structures the conversation
 - Try `/plugin install explanatory-output-style@claude-plugins-official` — notice how Claude's responses become more educational
-- Run `/plugin remove typescript-lsp` then ask Claude to review code for type issues — observe the difference in quality
 
 ---
 
@@ -548,85 +547,6 @@ Explain the runningTotal function in src/calculator.ts
 - Add an `audience` parameter to the skill: "If the requester specifies an audience (junior / senior / non-technical), adjust vocabulary and depth accordingly"
 - Chain this skill with `write-tests`: explain a function first, then ask Claude to write tests based on that explanation
 - Ask Claude to invoke the skill on a function it finds confusing — does the structured format help it catch its own misunderstandings?
-
----
-
-**Exercise 2-E: Build a Custom Plugin**
-
-**Goal:** Package the `code-explainer` skill into a distributable plugin that installs cleanly and persists across sessions.
-
-**Setup:** Create a new directory outside your project (or as a sibling):
-```bash
-mkdir code-explainer-plugin && cd code-explainer-plugin
-```
-
-Create `package.json`:
-```json
-{
-  "name": "code-explainer-plugin",
-  "version": "1.0.0",
-  "description": "Adds a code-explainer skill to Claude Code",
-  "claude-plugin": {
-    "skills": ["skills/code-explainer.md"],
-    "commands": ["commands/explain.md"]
-  }
-}
-```
-
-Create `skills/code-explainer.md` — copy your skill from Exercise 2-D.
-
-Create `commands/explain.md`:
-```markdown
----
-name: explain
-description: Explain the code in the current file or a specific function
----
-
-Apply the code-explainer skill to the target. If no target is specified, ask
-the user which file or function they want explained.
-```
-
-Create `README.md`:
-```markdown
-# code-explainer-plugin
-
-Adds the `code-explainer` skill and `/explain` command to Claude Code.
-
-## Install
-/plugin install ./code-explainer-plugin
-
-## Usage
-/explain
-/explain src/orderProcessor.ts
-```
-
-Go back to your project and install:
-```
-> /plugin install ../code-explainer-plugin
-```
-
-Then:
-```
-> /plugin list
-```
-
-**Observe:** `code-explainer-plugin` appears in the list. The `/explain` command is now available. The skill is loaded automatically.
-
-Type:
-```
-/explain src/orderProcessor.ts
-```
-
-**Observe:** The same structured explanation from Exercise 2-D, but now invoked through a clean command instead of a free-text prompt.
-
-Open a new Claude Code session in the same project and run `/plugin list` again.
-
-**Observe:** The plugin persists. It's not a one-session file — it's registered in Claude Code's plugin registry.
-
-**What to experiment with:**
-- Add a second skill to the plugin: package `write-tests.md` alongside `code-explainer.md`
-- Add a `/commands/document.md` command that runs the explainer and then writes a markdown doc file from the output
-- Share the plugin directory with a teammate and have them install it — verify the same commands appear in their session
 
 ---
 
