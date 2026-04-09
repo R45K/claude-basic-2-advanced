@@ -277,6 +277,58 @@ When you exit a Claude Code session and come back later, `CLAUDE.md` is still th
 
 More importantly, `CLAUDE.md` is *version controlled*. It lives in your git repo. It evolves as your project does. If you update your tech stack, move files, or change conventions, you update `CLAUDE.md`, and all future Claude Code sessions reflect those changes.
 
+### Where CLAUDE.md Files Can Live
+
+`CLAUDE.md` is not a single file — it's a layered system. Claude Code looks for `CLAUDE.md` files in multiple locations and merges them together, each scope serving a different purpose.
+
+**1. Global (`~/.claude/CLAUDE.md`)**
+
+The global file applies to every project you work on, regardless of where you run Claude Code. Use it for personal preferences that have nothing to do with a specific project:
+
+- Your preferred response style ("be concise, skip preamble")
+- Tools or patterns you always want to avoid
+- Personal workflows or shortcuts you rely on across all projects
+
+This file is yours alone — it's not checked into any repo and doesn't affect teammates. Think of it as your personal standing instructions to Claude.
+
+**2. Project root (`<project-root>/CLAUDE.md`)**
+
+This is the main project configuration and the one covered throughout this chapter. It lives at the root of your git repository and is typically committed to version control so the whole team benefits from it.
+
+Claude Code identifies the project root by looking for a `.git` directory. Any `CLAUDE.md` at that level is treated as the authoritative project config.
+
+**3. Subdirectory (`<subdir>/CLAUDE.md`)**
+
+In monorepos or projects with distinct sub-packages, you can place a `CLAUDE.md` inside any subdirectory. When Claude is working within that directory, it loads the subdirectory file in addition to the project root file.
+
+This is useful when different parts of the codebase have different conventions. For example:
+
+```
+my-monorepo/
+├── CLAUDE.md                  ← project-wide rules
+├── packages/
+│   ├── api/
+│   │   └── CLAUDE.md          ← API-specific rules (Express patterns, DB conventions)
+│   └── frontend/
+│       └── CLAUDE.md          ← Frontend-specific rules (React patterns, CSS conventions)
+```
+
+The `api/CLAUDE.md` might say "use the service/controller/model pattern" while `frontend/CLAUDE.md` says "use React Query for data fetching, never raw fetch calls." Both coexist without conflict.
+
+**How the layers interact**
+
+All applicable `CLAUDE.md` files are merged and loaded together. The order from most general to most specific is:
+
+| Location | Scope | Committed to git? |
+|---|---|---|
+| `~/.claude/CLAUDE.md` | All your projects | No — personal only |
+| `<project-root>/CLAUDE.md` | Entire project (all teammates) | Yes — shared with team |
+| `<subdir>/CLAUDE.md` | That subdirectory and below | Yes — shared with team |
+
+When files conflict, more specific files take precedence — subdirectory over project root over global.
+
+> TIP: Keep the global file for personal style preferences, and the project/subdirectory files for conventions the team should agree on. Mixing them causes confusion when teammates wonder why Claude behaves differently for one person.
+
 ### The `/revise-claude-md` Command
 
 As your project evolves, `CLAUDE.md` can drift out of sync with reality. The `claude-md-management` plugin (covered in section 6) provides a command to audit and update it:
